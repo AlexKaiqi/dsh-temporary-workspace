@@ -1,0 +1,35 @@
+{
+  "name": "dsh-temporary-session-workspace",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.7.0",
+  "scripts": {
+    "build": "pnpm run clean && pnpm run build:host && pnpm run build:client",
+    "build:host": "tsc -b tsconfig.host.json && pnpm --filter dsh-temporary-session exec tsdown --env.DSH_BUILD_FACE host && node scripts/generate-typert.mjs",
+    "build:client": "tsc -b tsconfig.client.json && pnpm --filter dsh-temporary-session exec tsdown --env.DSH_BUILD_FACE client",
+    "clean": "tsc -b tsconfig.host.json tsconfig.client.json --clean && node scripts/clean.mjs",
+    "typecheck": "pnpm run build:host && tsc -b tsconfig.client.json --pretty false",
+    "test": "vitest run",
+    "check": "pnpm run build && pnpm run test",
+    "pack:plugin": "pnpm --filter dsh-temporary-session pack --pack-destination artifacts"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-api-remotes": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-runtime": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-sidebar": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-home-paths": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-invariants": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-typert-generator": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-typert-protocol": "^0.1.0-rc.6",
+    "@deepseek-ai/schemastery": "^3.18.1",
+    "@types/node": "^22.20.0",
+    "tsdown": "^0.22.2",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8",
+    "zod": "^4.4.3"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  }
+}

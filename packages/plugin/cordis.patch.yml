@@ -1,0 +1,8 @@
+# The scratch root is durable on purpose: removing a successful Session's
+# directory would break history replay and later resume. Each click gets its
+# own child directory; only the short-lived Workspace registration is removed.
+- insert:
+    - id: temporary-session
+      name: dsh-temporary-session
+      config:
+        root: !!js dshHomePath('temporary-sessions')

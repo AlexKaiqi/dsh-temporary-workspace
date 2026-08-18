@@ -1,0 +1,106 @@
+{
+  "name": "dsh-temporary-session",
+  "description": "One-click isolated scratch sessions for DeepSeek Harness",
+  "version": "0.1.0-rc.1",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./invariant": {
+      "types": "./lib/types/invariant.d.ts",
+      "default": "./lib/invariant.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./types": {
+      "types": "./lib/types/types.d.ts",
+      "default": "./lib/types/types.js"
+    },
+    "./typert": {
+      "types": "./lib/typert.host.d.ts",
+      "default": "./lib/typert.host.js"
+    },
+    "./remote": {
+      "types": "./lib/typert.remote-client.d.ts",
+      "default": "./lib/typert.remote-client.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/invariant.js",
+    "lib/client.js",
+    "lib/client.js.map",
+    "lib/types/**/*.js",
+    "lib/types/**/*.d.ts",
+    "lib/typert.host.js",
+    "lib/typert.host.d.ts",
+    "lib/typert.remote-client.js",
+    "lib/typert.remote-client.d.ts",
+    "cordis.patch.yml",
+    "README.md",
+    "README.zh.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "inventory": {
+      "summary": {
+        "zh": "一键创建隔离的临时会话，无需选择工作目录；会话创建后自动撤销临时 Workspace 注册。",
+        "en": "Creates an isolated scratch session in one click without choosing a working directory, then removes its temporary Workspace registration."
+      },
+      "tags": [
+        "session",
+        "temporary",
+        "workspace",
+        "productivity"
+      ],
+      "dependencies": [
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ]
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ],
+      "platform": "web"
+    }
+  },
+  "scripts": {
+    "bundle": "tsdown",
+    "prepack": "pnpm --dir ../.. run build"
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "catalog:",
+    "zod": "catalog:"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "catalog:",
+    "@deepseek-ai/dsh-api-remotes": "catalog:",
+    "@deepseek-ai/dsh-client-runtime": "catalog:",
+    "@deepseek-ai/dsh-client-ui-sidebar": "catalog:",
+    "@deepseek-ai/dsh-home-paths": "catalog:",
+    "@deepseek-ai/dsh-invariants": "catalog:",
+    "@deepseek-ai/dsh-typert-protocol": "catalog:"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types",
+    "tsBuildInfoFile": "lib/tsconfig.host.tsbuildinfo",
+    "paths": {
+      "@deepseek-ai/dsh-typert-protocol": ["../../types/typert-protocol.d.ts"]
+    }
+  },
+  "include": [
+    "src/index.ts",
+    "src/invariant.ts",
+    "src/reservations.ts",
+    "src/types.ts"
+  ]
+}
