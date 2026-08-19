@@ -2,20 +2,14 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
-import { TemporaryDirectoryReservations } from './reservations.ts'
+import { TemporaryDirectoryReservations, DEFAULT_RESERVATION_RETENTION_MS, MIN_RESERVATION_RETENTION_MS } from './reservations.ts'
+import { resolveReservationRetentionMs, resolveReservationRoot, type Config } from './config.ts'
 import type {
   TemporarySessionReservation,
   TemporarySessionReservationRef,
   TemporarySessionReservationResult,
 } from './types.ts'
-
-/** Host configuration for scratch-directory placement. */
-export interface Config {
-  /** Durable parent directory. Defaults to `$DSH_HOME/temporary-sessions`. */
-  readonly root?: string
-}
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -30,6 +24,7 @@ export class TemporarySessionService extends TypertRemoteService {
 
   static Config: z<Config> = z.object({
     root: z.string(),
+    reservationRetentionMs: z.number().min(MIN_RESERVATION_RETENTION_MS).default(DEFAULT_RESERVATION_RETENTION_MS),
   })
 
   private readonly reservations: TemporaryDirectoryReservations
@@ -37,8 +32,13 @@ export class TemporarySessionService extends TypertRemoteService {
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'temporarySessions')
     this.reservations = new TemporaryDirectoryReservations(
-      config.root ?? dshHomePath('temporary-sessions'),
+      resolveReservationRoot(config),
+      resolveReservationRetentionMs(config),
     )
+    // A Host that crashed between reserve and keep/discard left directories whose
+    // reservation ids died with it. Reclaim them on startup so orphans cannot
+    // accumulate across restarts even if no new reservation is ever requested.
+    void this.reservations.sweepAbandoned().catch(() => undefined)
   }
 
   /**
@@ -56,7 +56,7 @@ export class TemporarySessionService extends TypertRemoteService {
    * @returns whether the reservation was still live.
    */
   @Remote('keep')
-  keep(request: TemporarySessionReservationRef): TemporarySessionReservationResult {
+  keep(request: TemporarySessionReservationRef): Promise<TemporarySessionReservationResult> {
     return this.reservations.keep(request.reservationId)
   }
 
@@ -71,10 +71,13 @@ export class TemporarySessionService extends TypertRemoteService {
   }
 }
 
-export { TemporaryDirectoryReservations } from './reservations.ts'
+export { TemporaryDirectoryReservations, DEFAULT_RESERVATION_RETENTION_MS, MIN_RESERVATION_RETENTION_MS } from './reservations.ts'
+export { resolveReservationRetentionMs, resolveReservationRoot } from './config.ts'
+export type { Config } from './config.ts'
 export type {
   TemporarySessionReservation,
   TemporarySessionReservationRef,
   TemporarySessionReservationResult,
+  TemporarySessionSweepResult,
 } from './types.ts'
 export default TemporarySessionService

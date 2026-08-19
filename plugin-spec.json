@@ -1,0 +1,53 @@
+{
+  "specVersion": "0.2.0",
+  "name": "dsh-temporary-session",
+  "pluginTypes": [
+    "F3"
+  ],
+  "facts": {
+    "modelVisible": false,
+    "registersTools": false,
+    "filesystem": "write",
+    "persistentState": true,
+    "subprocess": false,
+    "subagents": false,
+    "temporaryResources": true,
+    "customProtocol": true
+  },
+  "package": {
+    "path": "packages/plugin/package.json"
+  },
+  "tests": {
+    "contractTests": [],
+    "runtimeTests": [
+      {
+        "file": "packages/plugin/tests/workflow.spec.ts",
+        "layer": "L1"
+      },
+      {
+        "file": "packages/plugin/tests/client-apply.spec.ts",
+        "layer": "L1"
+      },
+      {
+        "file": "packages/plugin/tests/reservations.spec.ts",
+        "layer": "L2"
+      }
+    ]
+  },
+  "config": {
+    "file": "packages/plugin/src/config.ts",
+    "schemaExport": "Config",
+    "rootField": "root",
+    "gcField": "reservationRetentionMs",
+    "assembly": {
+      "file": "packages/plugin/src/index.ts"
+    }
+  },
+  "contracts": [
+    {
+      "name": "temporary-session-remote",
+      "file": "packages/plugin/spec/remote-protocol.json",
+      "versionField": "version"
+    }
+  ]
+}

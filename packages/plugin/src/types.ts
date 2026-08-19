@@ -15,3 +15,9 @@ export interface TemporarySessionReservationRef {
 export interface TemporarySessionReservationResult {
   readonly found: boolean
 }
+
+/** Result of reclaiming reservations abandoned by a crashed Host process. */
+export interface TemporarySessionSweepResult {
+  /** How many abandoned reservation directories were removed. */
+  readonly reclaimed: number
+}

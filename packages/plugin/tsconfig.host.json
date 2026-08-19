@@ -9,6 +9,7 @@
     }
   },
   "include": [
+    "src/config.ts",
     "src/index.ts",
     "src/invariant.ts",
     "src/reservations.ts",

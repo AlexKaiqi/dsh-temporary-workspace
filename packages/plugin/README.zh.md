@@ -19,6 +19,8 @@ DeepSeek Harness 的一键临时会话插件。适合临时分析文本、写一
 
 创建 Workspace 之前发生失败时，尚未采用的空目录会通过 Host 颁发的不透明 reservation id 回收。浏览器不能提交任意路径给清理接口。
 
+如果 Host 进程在"预留目录"和"采用目录"之间崩溃，reservation id 随进程一起消失，该目录将永远无法回收。因此每个尚未采用的预留都会在磁盘上留下标记，采用成功时清除标记。服务启动时以及每次新建预留时各扫一次，只回收仍带标记且超过 `reservationRetentionMs` 的目录。已被 Session 采用的目录没有标记，永远不会被回收，可恢复的历史会话不会丢失工作目录。
+
 ## 配置
 
 组合补丁默认使用：
@@ -29,9 +31,12 @@ DeepSeek Harness 的一键临时会话插件。适合临时分析文本、写一
       name: dsh-temporary-session
       config:
         root: !!js dshHomePath('temporary-sessions')
+        reservationRetentionMs: 3600000
 ```
 
 可以把 `root` 改为其他 Host 本地绝对路径。每个临时任务仍会获得单独的 `task-*` 子目录。
+
+`reservationRetentionMs` 是*尚未采用*的预留被判定为废弃前的宽限期，默认一小时。宽限期是必要的：并发 Host 正在进行中的预留对本进程不可见，因此更年轻的目录一律不动。小于一分钟的取值会被抬升到该下界。
 
 ## 安装
 

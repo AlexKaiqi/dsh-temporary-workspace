@@ -1,0 +1,43 @@
+{
+  "version": "1.0.0",
+  "name": "temporary-session-remote",
+  "summary": "Typert Remote protocol between the local Client half of the plugin and its Host half, for allocating and retiring scratch directories.",
+  "rationale": "This is not a DSH tool seam. The caller is the plugin's own Client running in the browser, reacting to a sidebar action, not the model. The Host keeps sole custody of the directory lifecycle so the browser can never submit a path to delete.",
+  "transport": {
+    "kind": "typert-remote",
+    "service": "temporarySessions",
+    "resultShape": "RemoteResult<T> = { ok: true, value: T } | { ok: false, error: { code, message } }"
+  },
+  "capabilitySecurity": {
+    "model": "opaque reservation id",
+    "description": "reserve() mints a UUID that is the only handle accepted by keep() and discard(). No method accepts a caller-supplied filesystem path, so a compromised or buggy Client cannot address an arbitrary directory.",
+    "verifiedBy": "packages/plugin/tests/reservations.spec.ts asserts that a path-like string passed to discard() resolves to { found: false } and removes nothing."
+  },
+  "methods": {
+    "reserve": {
+      "params": {},
+      "returns": "{ reservationId: string, path: string }",
+      "effect": "Creates a unique directory under the configured root, marked pending, and sweeps abandoned reservations first."
+    },
+    "keep": {
+      "params": "{ reservationId: string }",
+      "returns": "{ found: boolean }",
+      "effect": "Retires the reservation and clears its pending marker. The directory becomes durable because a Session has adopted it and may be resumed later."
+    },
+    "discard": {
+      "params": "{ reservationId: string }",
+      "returns": "{ found: boolean }",
+      "effect": "Removes a reservation that no Session adopted. Idempotent: a retired or unknown id reports found: false."
+    }
+  },
+  "lifecycle": {
+    "durability": "An adopted directory is never reclaimed. Deleting it would invalidate the historical Session's cwd, and Harness has no directory lifecycle tied to Session deletion.",
+    "crashWindow": "The reservation id lives only in Host memory. A Host that dies between reserve and keep/discard leaves a directory no id can address, so each unadopted reservation carries an on-disk pending marker.",
+    "reclamation": "A sweep runs on service construction and again on each reserve(). It removes only directories that still carry the pending marker, are not live in the current process, and whose marker is older than reservationRetentionMs.",
+    "graceRationale": "Reservations in flight on a concurrent Host are invisible to this process, so anything younger than the grace period is left alone. The configured value is raised to a one-minute floor."
+  },
+  "configuration": {
+    "root": "Durable parent directory; defaults to $DSH_HOME/temporary-sessions.",
+    "reservationRetentionMs": "Grace before an unadopted reservation is treated as abandoned; defaults to 3600000, floor 60000."
+  }
+}

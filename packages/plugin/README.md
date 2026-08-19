@@ -19,6 +19,8 @@ The plugin claims unscoped New Session actions. Each click runs one controlled t
 
 Failures before Workspace adoption discard the unused directory through an opaque Host-issued reservation id. The browser cannot submit an arbitrary path to the cleanup method.
 
+If the Host process dies between reserving a directory and adopting it, the reservation id dies with it and that directory would otherwise be unreachable forever. Each reservation is therefore marked on disk while it is still unadopted; adoption clears the mark. A sweep runs when the service starts and again on each new reservation, reclaiming only marked directories older than `reservationRetentionMs`. Adopted directories carry no mark and are never reclaimed, so a resumable Session cannot lose its working directory.
+
 ## Configuration
 
 The bundled composition patch uses:
@@ -29,9 +31,12 @@ The bundled composition patch uses:
       name: dsh-temporary-session
       config:
         root: !!js dshHomePath('temporary-sessions')
+        reservationRetentionMs: 3600000
 ```
 
 `root` may be changed to another absolute Host-local path. Every task still receives a separate `task-*` child directory.
+
+`reservationRetentionMs` is the grace period before an *unadopted* reservation is treated as abandoned; it defaults to one hour. The grace period matters because a concurrent Host's in-flight reservations are not visible to this process, so anything younger is left alone. Values below one minute are raised to that floor.
 
 ## Install
 
