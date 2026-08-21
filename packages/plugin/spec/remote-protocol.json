@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "temporary-session-remote",
   "summary": "Typert Remote protocol between the local Client half of the plugin and its Host half, for allocating and retiring scratch directories.",
   "rationale": "This is not a DSH tool seam. The caller is the plugin's own Client running in the browser, reacting to a sidebar action, not the model. The Host keeps sole custody of the directory lifecycle so the browser can never submit a path to delete.",
@@ -10,7 +10,7 @@
   },
   "capabilitySecurity": {
     "model": "opaque reservation id",
-    "description": "reserve() mints a UUID that is the only handle accepted by keep() and discard(). No method accepts a caller-supplied filesystem path, so a compromised or buggy Client cannot address an arbitrary directory.",
+    "description": "reserve() mints a UUID that is the only handle accepted by keep() and discard(). The settings API accepts a parent path only for validated future allocation; no cleanup method accepts a caller-supplied filesystem path, so a compromised or buggy Client cannot address an arbitrary directory for deletion.",
     "verifiedBy": "packages/plugin/tests/reservations.spec.ts asserts that a path-like string passed to discard() resolves to { found: false } and removes nothing."
   },
   "methods": {
@@ -28,6 +28,21 @@
       "params": "{ reservationId: string }",
       "returns": "{ found: boolean }",
       "effect": "Removes a reservation that no Session adopted. Idempotent: a retired or unknown id reports found: false."
+    },
+    "describeSettings": {
+      "params": {},
+      "returns": "{ revision, writable, pickerSupported, defaultRoot, root }",
+      "effect": "Returns the revision-fenced live root setting used by the Web settings card."
+    },
+    "saveSettings": {
+      "params": "{ expectedRevision: number, root: string }",
+      "returns": "{ revision, writable, pickerSupported, defaultRoot, root }",
+      "effect": "Normalizes an absolute non-filesystem-root path, creates and permission-checks it, persists it through DSH Settings, and applies it to future reservations."
+    },
+    "pickRoot": {
+      "params": {},
+      "returns": "{ supported: boolean, path: string | null }",
+      "effect": "Uses the Host-native directory-picker capability when available. A null path is cancellation; browse-only deployments report supported: false and keep manual absolute-path entry."
     }
   },
   "lifecycle": {
@@ -37,7 +52,7 @@
     "graceRationale": "Reservations in flight on a concurrent Host are invisible to this process, so anything younger than the grace period is left alone. The configured value is raised to a one-minute floor."
   },
   "configuration": {
-    "root": "Durable parent directory; defaults to $DSH_HOME/temporary-sessions.",
+    "root": "Durable parent directory and composition-layer reset value; defaults to $DSH_HOME/temporary-sessions. The Settings page stores a live user override.",
     "reservationRetentionMs": "Grace before an unadopted reservation is treated as abandoned; defaults to 3600000, floor 60000."
   }
 }

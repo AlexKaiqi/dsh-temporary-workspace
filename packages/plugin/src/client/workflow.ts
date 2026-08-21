@@ -21,6 +21,12 @@ export interface TemporarySessionWorkspacePort<WorkspaceId, SessionId> {
 
 /** Minimal Session navigation face consumed by the workflow. */
 export interface TemporarySessionNavigationPort<SessionId> {
+  readonly list: {
+    getSnapshot: () => {
+      readonly byId: Readonly<Record<string, { readonly blank: boolean } | undefined>>
+    }
+    subscribe: (listener: () => void) => () => void
+  }
   open: (sessionId: SessionId) => void
 }
 
@@ -32,8 +38,10 @@ export interface TemporarySessionDiagnostics {
 /** Completion details useful to callers and tests. */
 export interface TemporarySessionStartResult<SessionId> {
   readonly sessionId: SessionId
-  /** False only when Workspace deregistration failed after the Session opened. */
-  readonly workspaceDetached: boolean
+  /** False at return time because detachment is deliberately deferred. */
+  readonly workspaceDetached: false
+  /** The temporary Workspace will be detached after the first prompt is accepted. */
+  readonly workspaceDetachmentScheduled: true
 }
 
 /** Turn a generated Remote failure into the one user-facing workflow error. */
@@ -57,10 +65,40 @@ async function retire(
 }
 
 /**
+ * Keep a blank Session attached so the composer can resolve its Workspace,
+ * then detach once the first accepted prompt makes the Session self-sufficient.
+ */
+function detachWorkspaceAfterEngagement<WorkspaceId, SessionId>(ports: {
+  readonly workspaces: TemporarySessionWorkspacePort<WorkspaceId, SessionId>
+  readonly sessions: TemporarySessionNavigationPort<SessionId>
+  readonly diagnostics: TemporarySessionDiagnostics
+}, workspaceId: WorkspaceId, sessionId: SessionId): void {
+  let unsubscribe: (() => void) | undefined
+  let scheduled = false
+  const reconcile = (): void => {
+    if (scheduled) return
+    const summary = ports.sessions.list.getSnapshot().byId[String(sessionId)]
+    if (summary?.blank !== false) return
+    scheduled = true
+    unsubscribe?.()
+    void ports.workspaces.delete(workspaceId).catch((error: unknown) => {
+      ports.diagnostics.warn('temporary session engaged but its Workspace registration remains', error)
+    })
+  }
+  unsubscribe = ports.sessions.list.subscribe(reconcile)
+  reconcile()
+  // Some observable implementations call the subscriber synchronously.
+  if (scheduled) unsubscribe()
+}
+
+/**
  * Create an isolated directory, materialize a Session through the ordinary
- * Workspace API, open it, and remove only the temporary Workspace account.
+ * Workspace API, open it, and retire the temporary Workspace account after
+ * the first prompt is accepted. A blank Session must remain attached because
+ * the current conversation shell disables its composer without an owning
+ * Workspace.
  * @param ports - narrow Host Remote, Workspace, navigation, and diagnostic faces.
- * @returns the opened Session id and whether Workspace deregistration succeeded.
+ * @returns the opened Session id and confirmation that deferred detachment is armed.
  */
 export async function startTemporarySession<WorkspaceId, SessionId>(ports: {
   readonly remote: TemporarySessionRemotePort
@@ -97,12 +135,10 @@ export async function startTemporarySession<WorkspaceId, SessionId>(ports: {
 
   await retire(ports.remote, 'keep', reservation.reservationId, diagnostics)
   ports.sessions.open(sessionId)
-
-  try {
-    await ports.workspaces.delete(workspace.workspaceId)
-    return { sessionId, workspaceDetached: true }
-  } catch (error) {
-    diagnostics.warn('temporary session opened but its Workspace registration remains', error)
-    return { sessionId, workspaceDetached: false }
-  }
+  detachWorkspaceAfterEngagement(
+    { workspaces: ports.workspaces, sessions: ports.sessions, diagnostics },
+    workspace.workspaceId,
+    sessionId,
+  )
+  return { sessionId, workspaceDetached: false, workspaceDetachmentScheduled: true }
 }

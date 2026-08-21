@@ -68,7 +68,11 @@
       "dependencies": [
         "@deepseek-ai/dsh-api-remotes",
         "@deepseek-ai/dsh-client-runtime",
-        "@deepseek-ai/dsh-client-ui-sidebar"
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-settings-plugins",
+        "@deepseek-ai/dsh-host-directory-picker",
+        "@deepseek-ai/dsh-settings"
       ]
     },
     "bundle": {
@@ -78,7 +82,9 @@
       "inject": [
         "@deepseek-ai/dsh-api-remotes",
         "@deepseek-ai/dsh-client-runtime",
-        "@deepseek-ai/dsh-client-ui-sidebar"
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-settings-plugins"
       ],
       "platform": "web"
     }
@@ -96,9 +102,15 @@
     "@deepseek-ai/dsh-api-remotes": "catalog:",
     "@deepseek-ai/dsh-client-runtime": "catalog:",
     "@deepseek-ai/dsh-client-ui-sidebar": "catalog:",
+    "@deepseek-ai/dsh-client-ui-settings": "catalog:",
+    "@deepseek-ai/dsh-client-ui-settings-plugins": "catalog:",
+    "@deepseek-ai/dsh-client-ui-slots": "catalog:",
     "@deepseek-ai/dsh-home-paths": "catalog:",
+    "@deepseek-ai/dsh-host-directory-picker": "catalog:",
     "@deepseek-ai/dsh-invariants": "catalog:",
-    "@deepseek-ai/dsh-typert-protocol": "catalog:"
+    "@deepseek-ai/dsh-settings": "catalog:",
+    "@deepseek-ai/dsh-typert-protocol": "catalog:",
+    "react": "catalog:"
   },
   "engines": {
     "node": "^22.19.0 || >=24.0.0"

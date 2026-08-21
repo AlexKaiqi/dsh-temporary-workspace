@@ -13,6 +13,7 @@
     "src/index.ts",
     "src/invariant.ts",
     "src/reservations.ts",
+    "src/settings.ts",
     "src/types.ts"
   ]
 }

@@ -31,6 +31,14 @@
       {
         "file": "packages/plugin/tests/reservations.spec.ts",
         "layer": "L2"
+      },
+      {
+        "file": "packages/plugin/tests/settings-card.spec.ts",
+        "layer": "L1"
+      },
+      {
+        "file": "packages/plugin/tests/settings-service.spec.ts",
+        "layer": "L2"
       }
     ]
   },

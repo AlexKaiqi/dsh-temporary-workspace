@@ -3,7 +3,10 @@
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import type {} from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
 import temporarySessionRemote from 'dsh-temporary-session/remote'
+import { registerTemporarySessionSettingsCard, type TemporarySessionSettingsPort } from './settings-card.tsx'
+import { registerTemporarySessionSidebarAction } from './sidebar-action.tsx'
 import { startTemporarySession } from './workflow.ts'
 
 export { startTemporarySession } from './workflow.ts'
@@ -26,7 +29,7 @@ declare module '@deepseek-ai/cordis' {
 }
 
 /** Runtime services used by the action and generated Remote contribution. */
-export const inject = ['remote', 'workspaces', 'sessions']
+export const inject = ['remote', 'workspaces', 'sessions', 'slots']
 
 /**
  * Mount the Remote descriptor and claim every unscoped New Session click.
@@ -35,18 +38,35 @@ export const inject = ['remote', 'workspaces', 'sessions']
  */
 export async function apply(ctx: ClientContext): Promise<() => Promise<void>> {
   const disposeRemote = await ctx.remote.$mount(temporarySessionRemote)
+  const featureFiber = ctx.inject(['remote.temporarySessions'], (remoteCtx) => {
+    const remote = remoteCtx.remote.temporarySessions
+    registerTemporarySessionSettingsCard(
+      remoteCtx,
+      remote as unknown as TemporarySessionSettingsPort,
+    )
 
-  let pending: Promise<void> | undefined
-  ctx.on('sidebar/new-session', () => {
-    pending ??= startTemporarySession({
-      remote: ctx.remote.temporarySessions,
-      workspaces: ctx.workspaces,
-      sessions: ctx.sessions,
-    }).then(() => undefined).catch((error: unknown) => {
-      console.error('[temporary-session] creation failed:', error)
-    }).finally(() => { pending = undefined })
-    return true
+    let pending: Promise<void> | undefined
+    const start = (): Promise<void> => {
+      pending ??= startTemporarySession({
+        remote,
+        workspaces: remoteCtx.workspaces,
+        sessions: remoteCtx.sessions,
+      }).then(() => undefined).catch((error: unknown) => {
+        console.error('[temporary-session] creation failed:', error)
+      }).finally(() => { pending = undefined })
+      return pending
+    }
+
+    registerTemporarySessionSidebarAction(remoteCtx, start)
+
+    // Older patched shells may also offer the original unscoped New Session
+    // interception seam. Current shells use the dedicated footer action above.
+    remoteCtx.on('sidebar/new-session', () => {
+      void start()
+      return true
+    })
   })
+  await featureFiber
 
   return disposeRemote
 }

@@ -21,3 +21,24 @@ export interface TemporarySessionSweepResult {
   /** How many abandoned reservation directories were removed. */
   readonly reclaimed: number
 }
+
+/** Revision-fenced settings view consumed by the Web plugin card. */
+export interface TemporarySessionSettingsView {
+  readonly revision: number
+  readonly writable: boolean
+  readonly pickerSupported: boolean
+  readonly defaultRoot: string
+  readonly root: string
+}
+
+/** One full settings save from the Web card. */
+export interface TemporarySessionSettingsSaveRequest {
+  readonly expectedRevision: number
+  readonly root: string
+}
+
+/** Native directory-picker outcome; null means the operator cancelled. */
+export interface TemporarySessionRootPickResult {
+  readonly supported: boolean
+  readonly path: string | null
+}

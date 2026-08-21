@@ -4,6 +4,7 @@ import { isAbsolute, join, relative } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { DEFAULT_RESERVATION_RETENTION_MS, MIN_RESERVATION_RETENTION_MS, TemporaryDirectoryReservations } from '../src/reservations.ts'
 import { resolveReservationRetentionMs, resolveReservationRoot } from '../src/config.ts'
+import { DEFAULT_TEMPORARY_SESSION_ROOT, normalizeTemporarySessionRoot } from '../src/settings.ts'
 
 const roots: string[] = []
 
@@ -225,5 +226,16 @@ describe('configuration', () => {
     expect(resolveReservationRetentionMs({ reservationRetentionMs: 0 })).toBe(MIN_RESERVATION_RETENTION_MS)
     expect(resolveReservationRetentionMs({ reservationRetentionMs: -1 })).toBe(MIN_RESERVATION_RETENTION_MS)
   })
-})
 
+  it('normalizes page-entered roots and preserves the original default', () => {
+    expect(normalizeTemporarySessionRoot('  /tmp/scratch  ')).toBe('/tmp/scratch')
+    expect(normalizeTemporarySessionRoot('~/scratch')).toContain('/scratch')
+    expect(DEFAULT_TEMPORARY_SESSION_ROOT.endsWith('temporary-sessions')).toBe(true)
+  })
+
+  it('rejects ambiguous or dangerously broad page-entered roots', () => {
+    expect(() => normalizeTemporarySessionRoot('')).toThrow('cannot be empty')
+    expect(() => normalizeTemporarySessionRoot('relative/scratch')).toThrow('absolute path')
+    expect(() => normalizeTemporarySessionRoot('/')).toThrow('filesystem root')
+  })
+})

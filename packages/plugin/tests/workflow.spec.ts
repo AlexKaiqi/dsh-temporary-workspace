@@ -3,6 +3,8 @@ import { startTemporarySession } from '../src/client/workflow.ts'
 
 function bench() {
   const calls: string[] = []
+  const listeners = new Set<() => void>()
+  const summaries: Record<string, { blank: boolean } | undefined> = {}
   const remote = {
     reserve: vi.fn(async () => {
       calls.push('reserve')
@@ -28,20 +30,39 @@ function bench() {
     }),
     delete: vi.fn(async () => { calls.push('delete') }),
   }
-  const sessions = { open: vi.fn(() => { calls.push('open') }) }
+  const sessions = {
+    list: {
+      getSnapshot: () => ({ byId: summaries }),
+      subscribe: vi.fn((listener: () => void) => {
+        listeners.add(listener)
+        return () => { listeners.delete(listener) }
+      }),
+    },
+    open: vi.fn(() => { calls.push('open') }),
+  }
   const diagnostics = { warn: vi.fn() }
-  return { calls, remote, workspaces, sessions, diagnostics }
+  const engage = (sessionId = 'session'): void => {
+    summaries[sessionId] = { blank: false }
+    for (const listener of listeners) listener()
+  }
+  return { calls, remote, workspaces, sessions, diagnostics, summaries, engage }
 }
 
 describe('startTemporarySession', () => {
-  it('opens the Session before detaching its temporary Workspace', async () => {
+  it('keeps a blank Session attached, then detaches after its first accepted prompt', async () => {
     const b = bench()
+    b.summaries.session = { blank: true }
     await expect(startTemporarySession(b)).resolves.toEqual({
       sessionId: 'session',
-      workspaceDetached: true,
+      workspaceDetached: false,
+      workspaceDetachmentScheduled: true,
     })
-    expect(b.calls).toEqual(['reserve', 'create', 'connect', 'keep', 'open', 'delete'])
+    expect(b.calls).toEqual(['reserve', 'create', 'connect', 'keep', 'open'])
     expect(b.workspaces.create).toHaveBeenCalledWith({ path: '/scratch/task-1' })
+
+    b.engage()
+    await vi.waitFor(() => { expect(b.workspaces.delete).toHaveBeenCalledWith('workspace') })
+    expect(b.calls).toEqual(['reserve', 'create', 'connect', 'keep', 'open', 'delete'])
   })
 
   it('discards the scratch directory when Workspace adoption fails', async () => {
@@ -72,18 +93,25 @@ describe('startTemporarySession', () => {
     )
   })
 
-  it('keeps the opened Session usable when Workspace detachment fails', async () => {
+  it('keeps the engaged Session usable when deferred Workspace detachment fails', async () => {
     const b = bench()
+    b.summaries.session = { blank: true }
     b.workspaces.delete.mockRejectedValueOnce(new Error('delete failed'))
     await expect(startTemporarySession(b)).resolves.toEqual({
       sessionId: 'session',
       workspaceDetached: false,
+      workspaceDetachmentScheduled: true,
     })
     expect(b.sessions.open).toHaveBeenCalledWith('session')
-    expect(b.diagnostics.warn).toHaveBeenCalledWith(
-      'temporary session opened but its Workspace registration remains',
-      expect.any(Error),
-    )
+    expect(b.workspaces.delete).not.toHaveBeenCalled()
+
+    b.engage()
+    await vi.waitFor(() => {
+      expect(b.diagnostics.warn).toHaveBeenCalledWith(
+        'temporary session engaged but its Workspace registration remains',
+        expect.any(Error),
+      )
+    })
   })
 
   it('surfaces a typed Host reservation failure without touching Workspaces', async () => {
