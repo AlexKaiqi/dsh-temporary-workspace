@@ -64,13 +64,19 @@ describe('temporary Session client composition', () => {
       register: vi.fn(() => undefined),
       inject: vi.fn((_name: string, register: () => unknown) => register()),
     }
+    const locale = {
+      register: vi.fn(() => () => {}),
+      bind: vi.fn(() => (key: string) => key),
+    }
     const remote = new TestRemoteService(ctx, 'remote')
     ctx.provide('workspaces', workspaces as never)
     ctx.provide('sessions', sessions as never)
     ctx.provide('slots', slots as never)
+    ctx.provide('locale', locale as never)
 
     const fiber = ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
+    expect(locale.register).toHaveBeenCalledWith('temporarySession', expect.any(Object))
     expect(slots.inject).toHaveBeenCalledWith('settings.plugin.item', expect.any(Function))
     expect(slots.inject).toHaveBeenCalledWith('sidebar.footer.action', expect.any(Function))
     expect(slots.register).toHaveBeenCalledWith(

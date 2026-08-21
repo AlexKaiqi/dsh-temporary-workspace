@@ -67,6 +67,7 @@
       ],
       "dependencies": [
         "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-runtime",
         "@deepseek-ai/dsh-client-ui-sidebar",
         "@deepseek-ai/dsh-client-ui-settings",
@@ -81,6 +82,7 @@
     "client": {
       "inject": [
         "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-runtime",
         "@deepseek-ai/dsh-client-ui-sidebar",
         "@deepseek-ai/dsh-client-ui-settings",
@@ -100,6 +102,7 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": "catalog:",
     "@deepseek-ai/dsh-api-remotes": "catalog:",
+    "@deepseek-ai/dsh-client-locale": "catalog:",
     "@deepseek-ai/dsh-client-runtime": "catalog:",
     "@deepseek-ai/dsh-client-ui-sidebar": "catalog:",
     "@deepseek-ai/dsh-client-ui-settings": "catalog:",

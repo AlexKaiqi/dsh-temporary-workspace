@@ -4,10 +4,11 @@ import { useState } from 'react'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import type { TemporarySessionTranslate } from './locales.ts'
 
 interface TemporarySessionActionFace {
   start: () => Promise<void>
-  label: string
+  t: TemporarySessionTranslate
 }
 
 type TemporarySessionActionProps = PropsRuntime<'sidebar.footer.action'> & InjectFace<TemporarySessionActionFace>
@@ -22,8 +23,9 @@ function TemporarySessionIcon() {
 }
 
 /** A dedicated action keeps ordinary New Session semantics intact on rc.7+. */
-export function TemporarySessionSidebarAction({ wide, start, label }: TemporarySessionActionProps) {
+export function TemporarySessionSidebarAction({ wide, start, t }: TemporarySessionActionProps) {
   const [busy, setBusy] = useState(false)
+  const label = t('title')
   return (
     <button
       type="button"
@@ -54,10 +56,8 @@ const CSS = `
 export function registerTemporarySessionSidebarAction(
   ctx: ClientContext,
   start: () => Promise<void>,
+  t: TemporarySessionTranslate,
 ): void {
-  const label = typeof navigator !== 'undefined' && navigator.language.toLocaleLowerCase().startsWith('zh')
-    ? '临时会话'
-    : 'Temporary Session'
   if (typeof document !== 'undefined') {
     ctx.effect(() => {
       const style = document.createElement('style')
@@ -71,6 +71,7 @@ export function registerTemporarySessionSidebarAction(
     name: 'sidebar.footer.action',
     id: 'temporary-session',
     order: 0,
-    inject: () => ({ start, label }),
+    locale: 'temporarySession',
+    inject: () => ({ start, t }),
   }, TemporarySessionSidebarAction))
 }

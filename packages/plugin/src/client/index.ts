@@ -4,10 +4,12 @@ import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
+import type {} from '@deepseek-ai/dsh-client-locale/client'
 import temporarySessionRemote from 'dsh-temporary-session/remote'
 import { registerTemporarySessionSettingsCard, type TemporarySessionSettingsPort } from './settings-card.tsx'
 import { registerTemporarySessionSidebarAction } from './sidebar-action.tsx'
 import { startTemporarySession } from './workflow.ts'
+import { dictionaries, NS } from './locales.ts'
 
 export { startTemporarySession } from './workflow.ts'
 export type {
@@ -29,7 +31,7 @@ declare module '@deepseek-ai/cordis' {
 }
 
 /** Runtime services used by the action and generated Remote contribution. */
-export const inject = ['remote', 'workspaces', 'sessions', 'slots']
+export const inject = ['remote', 'workspaces', 'sessions', 'slots', 'locale']
 
 /**
  * Mount the Remote descriptor and claim every unscoped New Session click.
@@ -37,12 +39,15 @@ export const inject = ['remote', 'workspaces', 'sessions', 'slots']
  * @returns disposer for the generated Remote contribution.
  */
 export async function apply(ctx: ClientContext): Promise<() => Promise<void>> {
+  ctx.effect(() => ctx.locale.register(NS, dictionaries), 'temporary-session: locale dictionaries')
+  const t = ctx.locale.bind(NS)
   const disposeRemote = await ctx.remote.$mount(temporarySessionRemote)
   const featureFiber = ctx.inject(['remote.temporarySessions'], (remoteCtx) => {
     const remote = remoteCtx.remote.temporarySessions
     registerTemporarySessionSettingsCard(
       remoteCtx,
       remote as unknown as TemporarySessionSettingsPort,
+      t,
     )
 
     let pending: Promise<void> | undefined
@@ -57,7 +62,7 @@ export async function apply(ctx: ClientContext): Promise<() => Promise<void>> {
       return pending
     }
 
-    registerTemporarySessionSidebarAction(remoteCtx, start)
+    registerTemporarySessionSidebarAction(remoteCtx, start, t)
 
     // Older patched shells may also offer the original unscoped New Session
     // interception seam. Current shells use the dedicated footer action above.

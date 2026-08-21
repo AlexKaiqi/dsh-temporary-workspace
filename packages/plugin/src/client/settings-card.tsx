@@ -9,6 +9,7 @@ import type {
   TemporarySessionSettingsView,
 } from '../types.ts'
 import type { RemoteResult } from './workflow.ts'
+import type { TemporarySessionTranslate } from './locales.ts'
 
 export interface TemporarySessionSettingsPort {
   describeSettings: () => Promise<RemoteResult<TemporarySessionSettingsView>>
@@ -31,7 +32,7 @@ interface SettingsCardState {
 
 interface SettingsCardFace {
   hooks: { temporarySessionSettings: SnapshotStore<SettingsCardState> }
-  t: (key: string) => string
+  t: TemporarySessionTranslate
   edit: (root: string) => void
   save: () => void
   reload: () => void
@@ -84,7 +85,7 @@ export class TemporarySessionSettingsController {
 
   constructor(
     private readonly remote: TemporarySessionSettingsPort,
-    private readonly t: (key: string) => string,
+    private readonly t: TemporarySessionTranslate,
   ) {
     void this.reload()
   }
@@ -186,18 +187,6 @@ function TemporarySessionSettingsCard(props: SettingsCardProps) {
   )
 }
 
-const zh: Record<string, string> = {
-  title: '临时会话', description: '选择自动创建临时会话时使用的固定父目录。', loading: '正在读取设置…', retry: '重试',
-  root: '临时会话目录', rootHint: '每个新会话会在此目录下获得独立的 task-* 子目录。默认：', choose: '选择目录', picking: '选择中…',
-  default: '使用默认地址', discard: '放弃更改', save: '保存', saving: '保存中…',
-}
-
-const en: Record<string, string> = {
-  title: 'Temporary Sessions', description: 'Choose the fixed parent directory used for automatically created scratch Sessions.', loading: 'Loading settings…', retry: 'Retry',
-  root: 'Temporary Session directory', rootHint: 'Each new Session receives its own task-* child directory. Default:', choose: 'Choose directory', picking: 'Choosing…',
-  default: 'Use default', discard: 'Discard changes', save: 'Save', saving: 'Saving…',
-}
-
 const CSS = `
 .temporary-session-settings{list-style:none;border:1px solid var(--border-color,#d9d9d9);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:16px;background:var(--card-background,transparent)}
 .temporary-session-heading h3{margin:0 0 4px;font-size:16px}.temporary-session-heading p{margin:0;color:var(--text-secondary,#666);font-size:13px}
@@ -210,9 +199,8 @@ const CSS = `
 export function registerTemporarySessionSettingsCard(
   ctx: ClientContext,
   remote: TemporarySessionSettingsPort,
+  t: TemporarySessionTranslate,
 ): void {
-  const dictionary = typeof navigator !== 'undefined' && navigator.language.toLocaleLowerCase().startsWith('zh') ? zh : en
-  const t = (key: string) => dictionary[key] ?? key
   if (typeof document !== 'undefined') {
     ctx.effect(() => {
       const style = document.createElement('style')
@@ -227,6 +215,7 @@ export function registerTemporarySessionSettingsCard(
     name: 'settings.plugin.item',
     key: 'temporary-session',
     priority: 35,
+    locale: 'temporarySession',
     inject: () => controller.inject(),
   }, TemporarySessionSettingsCard))
 }
