@@ -21,16 +21,17 @@ import type {
   TemporarySessionRootPickResult,
   TemporarySessionSettingsSaveRequest,
   TemporarySessionSettingsView,
+  TemporarySessionWorkspace,
 } from './types.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
-    /** Scratch-directory reservation service exported to the local Client. */
+    /** Fixed scratch Workspace and legacy reservation service for the local Client. */
     temporarySessions: TemporarySessionService
   }
 }
 
-/** Host Remote that allocates opaque, safely disposable scratch directories. */
+/** Host Remote that prepares the fixed scratch Workspace and owns legacy reservations. */
 export class TemporarySessionService extends TypertRemoteService {
   static inject = ['settings', 'directoryPicker']
 
@@ -53,6 +54,15 @@ export class TemporarySessionService extends TypertRemoteService {
     this.retentionMs = resolveReservationRetentionMs(config)
     this.scope = registerTemporarySessionSettings(ctx, config)
     this.manager(this.scope.get().root)
+  }
+
+  /**
+   * Prepare the one durable Workspace shared by all temporary Sessions.
+   * @returns the absolute Host path that the Workspace API should register.
+   */
+  @Remote('prepareWorkspace')
+  async prepareWorkspace(): Promise<TemporarySessionWorkspace> {
+    return this.manager(this.scope.get().root).prepareWorkspace()
   }
 
   /**
@@ -101,7 +111,7 @@ export class TemporarySessionService extends TypertRemoteService {
     return this.settingsView()
   }
 
-  /** Validate, persist, and activate a new parent directory for future reservations. */
+  /** Validate, persist, and activate a new fixed Workspace directory. */
   @Remote('saveSettings')
   async saveSettings(request: TemporarySessionSettingsSaveRequest): Promise<TemporarySessionSettingsView> {
     const root = normalizeTemporarySessionRoot(request.root)
@@ -159,5 +169,6 @@ export type {
   TemporarySessionRootPickResult,
   TemporarySessionSettingsSaveRequest,
   TemporarySessionSettingsView,
+  TemporarySessionWorkspace,
 } from './types.ts'
 export default TemporarySessionService

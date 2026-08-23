@@ -19,6 +19,15 @@ async function store(): Promise<TemporaryDirectoryReservations> {
 }
 
 describe('TemporaryDirectoryReservations', () => {
+  it('prepares one fixed private Workspace root without creating a task child', async () => {
+    const reservations = await store()
+
+    await expect(reservations.prepareWorkspace()).resolves.toEqual({ path: reservations.root })
+    await expect(reservations.prepareWorkspace()).resolves.toEqual({ path: reservations.root })
+    expect((await stat(reservations.root)).isDirectory()).toBe(true)
+    expect((await stat(reservations.root)).mode & 0o777).toBe(0o700)
+  })
+
   it('creates a distinct private directory for every reservation', async () => {
     const reservations = await store()
     const first = await reservations.reserve()

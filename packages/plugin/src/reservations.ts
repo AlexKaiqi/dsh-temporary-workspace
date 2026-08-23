@@ -48,6 +48,20 @@ export class TemporaryDirectoryReservations {
   }
 
   /**
+   * Ensure the durable scratch root exists for the fixed temporary Workspace.
+   *
+   * The current product flow reuses this root directly. The reservation
+   * methods remain for protocol compatibility and abandoned-directory cleanup
+   * from older plugin versions.
+   * @returns the absolute scratch root.
+   */
+  async prepareWorkspace(): Promise<{ readonly path: string }> {
+    await mkdir(this.root, { recursive: true, mode: 0o700 })
+    await this.sweepAbandoned().catch(() => undefined)
+    return { path: this.root }
+  }
+
+  /**
    * Allocate one private scratch directory.
    *
    * Reclaims directories abandoned by an earlier Host process first, so orphans
@@ -56,9 +70,7 @@ export class TemporaryDirectoryReservations {
    * @returns the opaque reservation id and its new absolute path.
    */
   async reserve(): Promise<TemporarySessionReservation> {
-    await mkdir(this.root, { recursive: true, mode: 0o700 })
-    // Best-effort: reclaiming is never allowed to fail an allocation.
-    await this.sweepAbandoned().catch(() => undefined)
+    await this.prepareWorkspace()
     const path = await mkdtemp(join(this.root, RESERVATION_PREFIX))
     const reservationId = randomUUID()
     // Marked before the id is handed out, so a crash at any later instant leaves

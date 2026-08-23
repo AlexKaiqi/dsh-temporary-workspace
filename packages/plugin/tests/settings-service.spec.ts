@@ -54,6 +54,8 @@ describe('TemporarySessionService settings', () => {
     })
     await expect(stat(chosenRoot)).resolves.toBeDefined()
 
+    await expect(service.prepareWorkspace()).resolves.toEqual({ path: chosenRoot })
+
     const reservation = await service.reserve()
     expect(reservation.path.startsWith(`${chosenRoot}/task-`)).toBe(true)
     await expect(service.keep({ reservationId: reservation.reservationId })).resolves.toEqual({ found: true })

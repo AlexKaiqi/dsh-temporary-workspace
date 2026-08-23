@@ -3,15 +3,15 @@ import { describe, expect, it, vi } from 'vitest'
 import { apply, inject } from '../src/client/index.ts'
 
 describe('temporary Session client composition', () => {
-  it('claims the existing New Session event and coalesces repeated clicks', async () => {
+  it('prepares the bottom Workspace row and coalesces legacy event clicks', async () => {
     const ctx = new Context()
     let finishConnect!: (sessionId: string) => void
     const connect = new Promise<string>(resolve => { finishConnect = resolve })
     const disposeRemote = vi.fn(async () => {})
     const temporarySessions = {
-      reserve: vi.fn(async () => ({
+      prepareWorkspace: vi.fn(async () => ({
         ok: true as const,
-        value: { reservationId: 'reservation', path: '/scratch/task-1' },
+        value: { path: '/scratch' },
       })),
       keep: vi.fn(async () => ({ ok: true as const, value: { found: true } })),
       discard: vi.fn(async () => ({ ok: true as const, value: { found: true } })),
@@ -42,22 +42,12 @@ describe('temporary Session client composition', () => {
       })
     }
     const workspaces = {
-      create: vi.fn(async () => ({ workspaceId: 'workspace' })),
+      create: vi.fn(async () => ({ workspaceId: 'workspace', path: '/scratch', title: 'scratch' })),
+      rename: vi.fn(async () => ({ workspaceId: 'workspace', path: '/scratch', title: 'title' })),
+      insertBefore: vi.fn(async () => undefined),
       connectWorkspace: vi.fn(() => connect),
-      delete: vi.fn(async () => {}),
-    }
-    const sessionListeners = new Set<() => void>()
-    const sessionById: Record<string, { blank: boolean } | undefined> = {
-      session: { blank: true },
     }
     const sessions = {
-      list: {
-        getSnapshot: () => ({ byId: sessionById }),
-        subscribe: vi.fn((listener: () => void) => {
-          sessionListeners.add(listener)
-          return () => { sessionListeners.delete(listener) }
-        }),
-      },
       open: vi.fn(),
     }
     const slots = {
@@ -78,29 +68,24 @@ describe('temporary Session client composition', () => {
     await fiber.await()
     expect(locale.register).toHaveBeenCalledWith('temporarySession', expect.any(Object))
     expect(slots.inject).toHaveBeenCalledWith('settings.plugin.item', expect.any(Function))
-    expect(slots.inject).toHaveBeenCalledWith('sidebar.footer.action', expect.any(Function))
-    expect(slots.register).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'sidebar.footer.action', id: 'temporary-session' }),
-      expect.any(Function),
-    )
+    expect(slots.inject).not.toHaveBeenCalledWith('sidebar.footer.action', expect.any(Function))
+    await vi.waitFor(() => {
+      expect(temporarySessions.prepareWorkspace).toHaveBeenCalledOnce()
+      expect(workspaces.insertBefore).toHaveBeenCalledWith('workspace')
+    })
+
     expect(ctx.bail('sidebar/new-session')).toBe(true)
     expect(ctx.bail('sidebar/new-session')).toBe(true)
-    expect(temporarySessions.reserve).toHaveBeenCalledOnce()
+    await vi.waitFor(() => { expect(temporarySessions.prepareWorkspace).toHaveBeenCalledTimes(2) })
 
     finishConnect('session')
     await vi.waitFor(() => { expect(sessions.open).toHaveBeenCalledWith('session') })
-    expect(workspaces.delete).not.toHaveBeenCalled()
-
-    sessionById.session = { blank: false }
-    for (const listener of sessionListeners) listener()
-    await vi.waitFor(() => { expect(workspaces.delete).toHaveBeenCalledWith('workspace') })
 
     await Promise.resolve()
     expect(ctx.bail('sidebar/new-session')).toBe(true)
     await vi.waitFor(() => {
-      expect(temporarySessions.reserve).toHaveBeenCalledTimes(2)
+      expect(temporarySessions.prepareWorkspace).toHaveBeenCalledTimes(3)
       expect(sessions.open).toHaveBeenCalledTimes(2)
-      expect(workspaces.delete).toHaveBeenCalledTimes(2)
     })
 
     await fiber.dispose()

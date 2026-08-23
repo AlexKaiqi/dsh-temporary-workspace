@@ -1,7 +1,7 @@
 {
-  "version": "1.1.0",
+  "version": "1.2.0",
   "name": "temporary-session-remote",
-  "summary": "Typert Remote protocol between the local Client half of the plugin and its Host half, for allocating and retiring scratch directories.",
+  "summary": "Typert Remote protocol between the local Client half of the plugin and its Host half, primarily for preparing the fixed scratch Workspace and managing its live settings.",
   "rationale": "This is not a DSH tool seam. The caller is the plugin's own Client running in the browser, reacting to a sidebar action, not the model. The Host keeps sole custody of the directory lifecycle so the browser can never submit a path to delete.",
   "transport": {
     "kind": "typert-remote",
@@ -14,10 +14,15 @@
     "verifiedBy": "packages/plugin/tests/reservations.spec.ts asserts that a path-like string passed to discard() resolves to { found: false } and removes nothing."
   },
   "methods": {
+    "prepareWorkspace": {
+      "params": {},
+      "returns": "{ path: string }",
+      "effect": "Creates the configured root with private mode when necessary, sweeps abandoned legacy reservations, and returns the same fixed path on every call. The Client idempotently registers this path as one Workspace and connects through the Host's standard blank-reuse Session flow."
+    },
     "reserve": {
       "params": {},
       "returns": "{ reservationId: string, path: string }",
-      "effect": "Creates a unique directory under the configured root, marked pending, and sweeps abandoned reservations first."
+      "effect": "Legacy-compatible path: creates a unique directory under the configured root, marked pending, and sweeps abandoned reservations first. The current Client does not call this method."
     },
     "keep": {
       "params": "{ reservationId: string }",
@@ -37,7 +42,7 @@
     "saveSettings": {
       "params": "{ expectedRevision: number, root: string }",
       "returns": "{ revision, writable, pickerSupported, defaultRoot, root }",
-      "effect": "Normalizes an absolute non-filesystem-root path, creates and permission-checks it, persists it through DSH Settings, and applies it to future reservations."
+      "effect": "Normalizes an absolute non-filesystem-root path, creates and permission-checks it, persists it through DSH Settings, and makes it the fixed Workspace used by future temporary Sessions."
     },
     "pickRoot": {
       "params": {},
@@ -46,13 +51,15 @@
     }
   },
   "lifecycle": {
-    "durability": "An adopted directory is never reclaimed. Deleting it would invalidate the historical Session's cwd, and Harness has no directory lifecycle tied to Session deletion.",
+    "currentFlow": "All new temporary Sessions share one durable Workspace rooted at configuration.root, so the sidebar contains one group instead of one Workspace or one Ungrouped row per temporary task.",
+    "tradeoff": "Workspace membership requires Session cwd to equal the Workspace canonical path. Consequently the fixed-group design shares one scratch filesystem root across temporary Sessions; per-Session cwd isolation and one fixed Workspace group cannot both be represented by the current Host contract.",
+    "durability": "The fixed Workspace root and every legacy adopted directory are never reclaimed. Deleting either would invalidate a historical Session's cwd, and Harness has no directory lifecycle tied to Session deletion.",
     "crashWindow": "The reservation id lives only in Host memory. A Host that dies between reserve and keep/discard leaves a directory no id can address, so each unadopted reservation carries an on-disk pending marker.",
     "reclamation": "A sweep runs on service construction and again on each reserve(). It removes only directories that still carry the pending marker, are not live in the current process, and whose marker is older than reservationRetentionMs.",
     "graceRationale": "Reservations in flight on a concurrent Host are invisible to this process, so anything younger than the grace period is left alone. The configured value is raised to a one-minute floor."
   },
   "configuration": {
-    "root": "Durable parent directory and composition-layer reset value; defaults to $DSH_HOME/temporary-sessions. The Settings page stores a live user override.",
+    "root": "Durable fixed Workspace directory and composition-layer reset value; defaults to $DSH_HOME/temporary-sessions. The Settings page stores a live user override.",
     "reservationRetentionMs": "Grace before an unadopted reservation is treated as abandoned; defaults to 3600000, floor 60000."
   }
 }

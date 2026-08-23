@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-A DeepSeek Harness plugin that makes the sidebar's existing **New Session** action open an isolated scratch Session without asking for a working directory. Project-bound work continues to use the page's existing Workspace controls.
+A DeepSeek Harness plugin that keeps one fixed **Temporary Session** Workspace at the bottom of the Workspace list. Use that group's native New Session control to open scratch Sessions without choosing a working directory, while project-bound work continues to use ordinary Workspace controls.
 
 The installable package lives in [`packages/plugin`](packages/plugin). Its README documents behavior, retention semantics, compatibility, configuration, and installation.
 

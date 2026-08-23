@@ -1,7 +1,7 @@
 {
   "name": "dsh-temporary-session",
-  "description": "One-click isolated scratch sessions for DeepSeek Harness",
-  "version": "0.1.0-rc.1",
+  "description": "One-click scratch sessions grouped in one fixed DeepSeek Harness Workspace",
+  "version": "0.1.0-rc.2",
   "publishConfig": {
     "access": "public"
   },
@@ -56,8 +56,8 @@
   "dsh": {
     "inventory": {
       "summary": {
-        "zh": "一键创建隔离的临时会话，无需选择工作目录；会话创建后自动撤销临时 Workspace 注册。",
-        "en": "Creates an isolated scratch session in one click without choosing a working directory, then removes its temporary Workspace registration."
+        "zh": "一键在固定的临时 Workspace 标签下打开会话，无需选择工作目录。",
+        "en": "Opens a Session in one fixed scratch Workspace group without choosing a working directory."
       },
       "tags": [
         "session",

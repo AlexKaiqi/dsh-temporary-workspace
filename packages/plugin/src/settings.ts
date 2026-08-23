@@ -11,7 +11,7 @@ import { resolveReservationRoot } from './config.ts'
 
 /** User-owned placement settings edited from the Web plugin settings page. */
 export interface TemporarySessionSettings {
-  /** Absolute parent directory under which unique `task-*` directories live. */
+  /** Absolute directory registered as the fixed temporary Workspace. */
   readonly root: string
 }
 

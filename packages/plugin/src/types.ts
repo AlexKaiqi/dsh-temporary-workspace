@@ -6,6 +6,12 @@ export interface TemporarySessionReservation {
   readonly path: string
 }
 
+/** Fixed scratch Workspace prepared by the Host for every temporary Session. */
+export interface TemporarySessionWorkspace {
+  /** Absolute Host path registered once and reused as one Workspace group. */
+  readonly path: string
+}
+
 /** Reference to one outstanding scratch-directory reservation. */
 export interface TemporarySessionReservationRef {
   readonly reservationId: string

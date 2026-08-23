@@ -1,128 +1,98 @@
 import { describe, expect, it, vi } from 'vitest'
-import { startTemporarySession } from '../src/client/workflow.ts'
+import { ensureTemporaryWorkspace, startTemporarySession } from '../src/client/workflow.ts'
 
 function bench() {
   const calls: string[] = []
-  const listeners = new Set<() => void>()
-  const summaries: Record<string, { blank: boolean } | undefined> = {}
+  let nextSession = 0
+  let workspaceTitle = 'scratch'
   const remote = {
-    reserve: vi.fn(async () => {
-      calls.push('reserve')
-      return { ok: true as const, value: { reservationId: 'reservation', path: '/scratch/task-1' } }
-    }),
-    keep: vi.fn(async () => {
-      calls.push('keep')
-      return { ok: true as const, value: { found: true } }
-    }),
-    discard: vi.fn(async () => {
-      calls.push('discard')
-      return { ok: true as const, value: { found: true } }
+    prepareWorkspace: vi.fn(async () => {
+      calls.push('prepare')
+      return { ok: true as const, value: { path: '/scratch' } }
     }),
   }
   const workspaces = {
     create: vi.fn(async () => {
-      calls.push('create')
-      return { workspaceId: 'workspace' }
+      calls.push('workspace')
+      return { workspaceId: 'workspace', path: '/scratch', title: workspaceTitle }
     }),
+    rename: vi.fn(async (_workspaceId: string, title: string) => {
+      calls.push('rename')
+      workspaceTitle = title
+    }),
+    insertBefore: vi.fn(async () => { calls.push('append') }),
     connectWorkspace: vi.fn(async () => {
-      calls.push('connect')
-      return 'session'
+      calls.push('session')
+      nextSession += 1
+      return `session-${nextSession}`
     }),
-    delete: vi.fn(async () => { calls.push('delete') }),
   }
   const sessions = {
-    list: {
-      getSnapshot: () => ({ byId: summaries }),
-      subscribe: vi.fn((listener: () => void) => {
-        listeners.add(listener)
-        return () => { listeners.delete(listener) }
-      }),
-    },
     open: vi.fn(() => { calls.push('open') }),
   }
-  const diagnostics = { warn: vi.fn() }
-  const engage = (sessionId = 'session'): void => {
-    summaries[sessionId] = { blank: false }
-    for (const listener of listeners) listener()
-  }
-  return { calls, remote, workspaces, sessions, diagnostics, summaries, engage }
+  return { calls, remote, workspaces, sessions, title: 'Temporary Sessions' }
 }
 
-describe('startTemporarySession', () => {
-  it('keeps a blank Session attached, then detaches after its first accepted prompt', async () => {
+describe('ensureTemporaryWorkspace', () => {
+  it('creates the fixed group at the bottom without opening a Session', async () => {
     const b = bench()
-    b.summaries.session = { blank: true }
-    await expect(startTemporarySession(b)).resolves.toEqual({
-      sessionId: 'session',
-      workspaceDetached: false,
-      workspaceDetachmentScheduled: true,
-    })
-    expect(b.calls).toEqual(['reserve', 'create', 'connect', 'keep', 'open'])
-    expect(b.workspaces.create).toHaveBeenCalledWith({ path: '/scratch/task-1' })
 
-    b.engage()
-    await vi.waitFor(() => { expect(b.workspaces.delete).toHaveBeenCalledWith('workspace') })
-    expect(b.calls).toEqual(['reserve', 'create', 'connect', 'keep', 'open', 'delete'])
-  })
+    await expect(ensureTemporaryWorkspace(b)).resolves.toEqual({ workspaceId: 'workspace' })
 
-  it('discards the scratch directory when Workspace adoption fails', async () => {
-    const b = bench()
-    b.workspaces.create.mockRejectedValueOnce(new Error('adoption failed'))
-    await expect(startTemporarySession(b)).rejects.toThrow('adoption failed')
-    expect(b.calls).toEqual(['reserve', 'discard'])
-    expect(b.remote.discard).toHaveBeenCalledWith({ reservationId: 'reservation' })
-  })
-
-  it('rolls back the Workspace and directory when Session creation fails', async () => {
-    const b = bench()
-    b.workspaces.connectWorkspace.mockRejectedValueOnce(new Error('session failed'))
-    await expect(startTemporarySession(b)).rejects.toThrow('session failed')
-    expect(b.calls).toEqual(['reserve', 'create', 'delete', 'discard'])
+    expect(b.calls).toEqual(['prepare', 'workspace', 'rename', 'append'])
+    expect(b.workspaces.insertBefore).toHaveBeenCalledWith('workspace')
+    expect(b.workspaces.connectWorkspace).not.toHaveBeenCalled()
     expect(b.sessions.open).not.toHaveBeenCalled()
   })
+})
 
-  it('preserves a registered directory when rollback cannot remove its Workspace', async () => {
+describe('startTemporarySession', () => {
+  it('opens Sessions through one fixed scratch Workspace', async () => {
     const b = bench()
-    b.workspaces.connectWorkspace.mockRejectedValueOnce(new Error('session failed'))
-    b.workspaces.delete.mockRejectedValueOnce(new Error('delete failed'))
-    await expect(startTemporarySession(b)).rejects.toThrow('session failed')
-    expect(b.calls).toEqual(['reserve', 'create', 'keep'])
-    expect(b.diagnostics.warn).toHaveBeenCalledWith(
-      'temporary session rollback failed; preserving its registered directory',
-      expect.any(Error),
-    )
+    await expect(startTemporarySession(b)).resolves.toEqual({ sessionId: 'session-1' })
+    await expect(startTemporarySession(b)).resolves.toEqual({ sessionId: 'session-2' })
+    expect(b.calls).toEqual([
+      'prepare', 'workspace', 'rename', 'append', 'session', 'open',
+      'prepare', 'workspace', 'append', 'session', 'open',
+    ])
+    expect(b.workspaces.create).toHaveBeenNthCalledWith(1, { path: '/scratch' })
+    expect(b.workspaces.create).toHaveBeenNthCalledWith(2, { path: '/scratch' })
+    expect(b.workspaces.insertBefore).toHaveBeenNthCalledWith(1, 'workspace')
+    expect(b.workspaces.insertBefore).toHaveBeenNthCalledWith(2, 'workspace')
+    expect(b.workspaces.connectWorkspace).toHaveBeenNthCalledWith(1, 'workspace')
+    expect(b.workspaces.connectWorkspace).toHaveBeenNthCalledWith(2, 'workspace')
+    expect(b.sessions.open).toHaveBeenNthCalledWith(1, 'session-1')
+    expect(b.sessions.open).toHaveBeenNthCalledWith(2, 'session-2')
   })
 
-  it('keeps the engaged Session usable when deferred Workspace detachment fails', async () => {
+  it('preserves a Workspace title the user already customized', async () => {
     const b = bench()
-    b.summaries.session = { blank: true }
-    b.workspaces.delete.mockRejectedValueOnce(new Error('delete failed'))
-    await expect(startTemporarySession(b)).resolves.toEqual({
-      sessionId: 'session',
-      workspaceDetached: false,
-      workspaceDetachmentScheduled: true,
+    b.workspaces.create.mockResolvedValueOnce({
+      workspaceId: 'workspace', path: '/scratch', title: 'My Scratchpad',
     })
-    expect(b.sessions.open).toHaveBeenCalledWith('session')
-    expect(b.workspaces.delete).not.toHaveBeenCalled()
 
-    b.engage()
-    await vi.waitFor(() => {
-      expect(b.diagnostics.warn).toHaveBeenCalledWith(
-        'temporary session engaged but its Workspace registration remains',
-        expect.any(Error),
-      )
-    })
+    await startTemporarySession(b)
+
+    expect(b.workspaces.rename).not.toHaveBeenCalled()
+    expect(b.sessions.open).toHaveBeenCalledWith('session-1')
   })
 
-  it('surfaces a typed Host reservation failure without touching Workspaces', async () => {
+  it('surfaces a typed Host preparation failure without touching Workspaces', async () => {
     const b = bench()
-    b.remote.reserve.mockResolvedValueOnce({
+    b.remote.prepareWorkspace.mockResolvedValueOnce({
       ok: false as const,
       error: { code: 'internal', message: 'disk unavailable' },
     })
     await expect(startTemporarySession(b)).rejects.toThrow(
-      'temporary session reservation failed: internal: disk unavailable',
+      'temporary Workspace preparation failed: internal: disk unavailable',
     )
     expect(b.workspaces.create).not.toHaveBeenCalled()
+  })
+
+  it('does not open a Session when Host creation fails', async () => {
+    const b = bench()
+    b.workspaces.connectWorkspace.mockRejectedValueOnce(new Error('session failed'))
+    await expect(startTemporarySession(b)).rejects.toThrow('session failed')
+    expect(b.sessions.open).not.toHaveBeenCalled()
   })
 })

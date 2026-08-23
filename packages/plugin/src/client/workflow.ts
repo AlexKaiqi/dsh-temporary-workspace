@@ -7,138 +7,85 @@ export type RemoteResult<T> =
 
 /** Minimal generated Remote face consumed by the workflow. */
 export interface TemporarySessionRemotePort {
-  reserve: () => Promise<RemoteResult<{ reservationId: string; path: string }>>
-  keep: (request: { reservationId: string }) => Promise<RemoteResult<{ found: boolean }>>
-  discard: (request: { reservationId: string }) => Promise<RemoteResult<{ found: boolean }>>
+  prepareWorkspace: () => Promise<RemoteResult<{ path: string }>>
 }
 
 /** Minimal Workspace service face consumed by the workflow. */
 export interface TemporarySessionWorkspacePort<WorkspaceId, SessionId> {
-  create: (input: { path: string }) => Promise<{ workspaceId: WorkspaceId }>
+  create: (input: { path: string }) => Promise<{
+    workspaceId: WorkspaceId
+    path: string
+    title: string
+  }>
   connectWorkspace: (workspaceId: WorkspaceId) => Promise<SessionId>
-  delete: (workspaceId: WorkspaceId) => Promise<void>
+  rename: (workspaceId: WorkspaceId, title: string) => Promise<unknown>
+  insertBefore: (workspaceId: WorkspaceId, beforeWorkspaceId?: WorkspaceId) => Promise<void>
+}
+
+/** Fixed Workspace details shared by startup and legacy one-click flows. */
+export interface TemporarySessionWorkspaceResult<WorkspaceId> {
+  readonly workspaceId: WorkspaceId
 }
 
 /** Minimal Session navigation face consumed by the workflow. */
 export interface TemporarySessionNavigationPort<SessionId> {
-  readonly list: {
-    getSnapshot: () => {
-      readonly byId: Readonly<Record<string, { readonly blank: boolean } | undefined>>
-    }
-    subscribe: (listener: () => void) => () => void
-  }
   open: (sessionId: SessionId) => void
-}
-
-/** Diagnostic sink for best-effort cleanup failures. */
-export interface TemporarySessionDiagnostics {
-  warn: (message: string, error: unknown) => void
 }
 
 /** Completion details useful to callers and tests. */
 export interface TemporarySessionStartResult<SessionId> {
   readonly sessionId: SessionId
-  /** False at return time because detachment is deliberately deferred. */
-  readonly workspaceDetached: false
-  /** The temporary Workspace will be detached after the first prompt is accepted. */
-  readonly workspaceDetachmentScheduled: true
 }
 
-/** Turn a generated Remote failure into the one user-facing workflow error. */
-function remoteError(operation: string, result: RemoteResult<unknown> & { readonly ok: false }): Error {
-  return new Error(`${operation} failed: ${result.error.code}: ${result.error.message}`)
-}
-
-/** Best-effort retirement of the opaque Host reservation. */
-async function retire(
-  remote: TemporarySessionRemotePort,
-  operation: 'keep' | 'discard',
-  reservationId: string,
-  diagnostics: TemporarySessionDiagnostics,
-): Promise<void> {
-  try {
-    const result = await remote[operation]({ reservationId })
-    if (!result.ok) diagnostics.warn(`temporary session ${operation} failed`, remoteError(operation, result))
-  } catch (error) {
-    diagnostics.warn(`temporary session ${operation} failed`, error)
-  }
+/** WorkspaceRegistry's create-time title is the canonical path basename. */
+function defaultWorkspaceTitle(path: string): string {
+  return path.replace(/[\\/]+$/, '').split(/[\\/]/).at(-1) ?? path
 }
 
 /**
- * Keep a blank Session attached so the composer can resolve its Workspace,
- * then detach once the first accepted prompt makes the Session self-sufficient.
+ * Ensure the fixed scratch Workspace exists, give an untouched record its
+ * localized title, and keep that special-purpose group below normal Workspaces.
+ * Repeated calls are idempotent because Workspace create and insertBefore are.
+ * @param ports - narrow Host Remote and Workspace faces.
+ * @returns the fixed Workspace id.
  */
-function detachWorkspaceAfterEngagement<WorkspaceId, SessionId>(ports: {
+export async function ensureTemporaryWorkspace<WorkspaceId, SessionId>(ports: {
+  readonly remote: TemporarySessionRemotePort
   readonly workspaces: TemporarySessionWorkspacePort<WorkspaceId, SessionId>
-  readonly sessions: TemporarySessionNavigationPort<SessionId>
-  readonly diagnostics: TemporarySessionDiagnostics
-}, workspaceId: WorkspaceId, sessionId: SessionId): void {
-  let unsubscribe: (() => void) | undefined
-  let scheduled = false
-  const reconcile = (): void => {
-    if (scheduled) return
-    const summary = ports.sessions.list.getSnapshot().byId[String(sessionId)]
-    if (summary?.blank !== false) return
-    scheduled = true
-    unsubscribe?.()
-    void ports.workspaces.delete(workspaceId).catch((error: unknown) => {
-      ports.diagnostics.warn('temporary session engaged but its Workspace registration remains', error)
-    })
+  readonly title: string
+}): Promise<TemporarySessionWorkspaceResult<WorkspaceId>> {
+  const prepared = await ports.remote.prepareWorkspace()
+  if (!prepared.ok) {
+    throw new Error(`temporary Workspace preparation failed: ${prepared.error.code}: ${prepared.error.message}`)
   }
-  unsubscribe = ports.sessions.list.subscribe(reconcile)
-  reconcile()
-  // Some observable implementations call the subscriber synchronously.
-  if (scheduled) unsubscribe()
+  const workspace = await ports.workspaces.create({ path: prepared.value.path })
+  if (workspace.title === defaultWorkspaceTitle(workspace.path) && workspace.title !== ports.title) {
+    try {
+      await ports.workspaces.rename(workspace.workspaceId, ports.title)
+    } catch (error) {
+      // Naming is presentation-only: a conflict must not block Workspace use.
+      console.warn('[temporary-session] fixed Workspace rename failed', error)
+    }
+  }
+  await ports.workspaces.insertBefore(workspace.workspaceId)
+  return { workspaceId: workspace.workspaceId }
 }
 
 /**
- * Create an isolated directory, materialize a Session through the ordinary
- * Workspace API, open it, and retire the temporary Workspace account after
- * the first prompt is accepted. A blank Session must remain attached because
- * the current conversation shell disables its composer without an owning
- * Workspace.
- * @param ports - narrow Host Remote, Workspace, navigation, and diagnostic faces.
- * @returns the opened Session id and confirmation that deferred detachment is armed.
+ * Prepare one fixed scratch Workspace, connect its reusable or fresh blank
+ * Session, and open that Session. Current shells use the Workspace group's own
+ * action; this flow remains for the optional legacy extension event.
+ * @param ports - narrow Host Remote, Workspace, and navigation faces.
+ * @returns the opened Session id.
  */
 export async function startTemporarySession<WorkspaceId, SessionId>(ports: {
   readonly remote: TemporarySessionRemotePort
   readonly workspaces: TemporarySessionWorkspacePort<WorkspaceId, SessionId>
   readonly sessions: TemporarySessionNavigationPort<SessionId>
-  readonly diagnostics?: TemporarySessionDiagnostics
+  readonly title: string
 }): Promise<TemporarySessionStartResult<SessionId>> {
-  const diagnostics = ports.diagnostics ?? console
-  const reserved = await ports.remote.reserve()
-  if (!reserved.ok) throw remoteError('temporary session reservation', reserved)
-  const reservation = reserved.value
-
-  let workspace: { workspaceId: WorkspaceId }
-  try {
-    workspace = await ports.workspaces.create({ path: reservation.path })
-  } catch (error) {
-    await retire(ports.remote, 'discard', reservation.reservationId, diagnostics)
-    throw error
-  }
-
-  let sessionId: SessionId
-  try {
-    sessionId = await ports.workspaces.connectWorkspace(workspace.workspaceId)
-  } catch (error) {
-    try {
-      await ports.workspaces.delete(workspace.workspaceId)
-      await retire(ports.remote, 'discard', reservation.reservationId, diagnostics)
-    } catch (cleanupError) {
-      diagnostics.warn('temporary session rollback failed; preserving its registered directory', cleanupError)
-      await retire(ports.remote, 'keep', reservation.reservationId, diagnostics)
-    }
-    throw error
-  }
-
-  await retire(ports.remote, 'keep', reservation.reservationId, diagnostics)
+  const { workspaceId } = await ensureTemporaryWorkspace(ports)
+  const sessionId = await ports.workspaces.connectWorkspace(workspaceId)
   ports.sessions.open(sessionId)
-  detachWorkspaceAfterEngagement(
-    { workspaces: ports.workspaces, sessions: ports.sessions, diagnostics },
-    workspace.workspaceId,
-    sessionId,
-  )
-  return { sessionId, workspaceDetached: false, workspaceDetachmentScheduled: true }
+  return { sessionId }
 }
