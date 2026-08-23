@@ -10,6 +10,19 @@ export interface TemporarySessionReservation {
 export interface TemporarySessionWorkspace {
   /** Absolute Host path registered once and reused as one Workspace group. */
   readonly path: string
+  /** Durable Workspace identity used to account every temporary Session. */
+  readonly workspaceId: string
+}
+
+/** Existing Session to account under the configured temporary Workspace. */
+export interface TemporaryWorkspaceSessionRef {
+  readonly sessionId: string
+}
+
+/** Result after a Session has been durably attached to the temporary Workspace. */
+export interface TemporaryWorkspaceSessionResult {
+  readonly attached: true
+  readonly workspaceId: string
 }
 
 /** Reference to one outstanding scratch-directory reservation. */

@@ -8,7 +8,7 @@ function bench() {
   const remote = {
     prepareWorkspace: vi.fn(async () => {
       calls.push('prepare')
-      return { ok: true as const, value: { path: '/scratch' } }
+      return { ok: true as const, value: { path: '/scratch', workspaceId: 'workspace' } }
     }),
   }
   const workspaces = {
@@ -30,7 +30,7 @@ function bench() {
   const sessions = {
     open: vi.fn(() => { calls.push('open') }),
   }
-  return { calls, remote, workspaces, sessions, title: 'Temporary Sessions' }
+  return { calls, remote, workspaces, sessions, title: 'Temporary Workspace' }
 }
 
 describe('ensureTemporaryWorkspace', () => {

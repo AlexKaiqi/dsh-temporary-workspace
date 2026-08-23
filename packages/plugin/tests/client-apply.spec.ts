@@ -11,7 +11,7 @@ describe('temporary Session client composition', () => {
     const temporarySessions = {
       prepareWorkspace: vi.fn(async () => ({
         ok: true as const,
-        value: { path: '/scratch' },
+        value: { path: '/scratch', workspaceId: 'workspace' },
       })),
       keep: vi.fn(async () => ({ ok: true as const, value: { found: true } })),
       discard: vi.fn(async () => ({ ok: true as const, value: { found: true } })),

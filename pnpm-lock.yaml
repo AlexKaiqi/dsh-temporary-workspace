@@ -45,6 +45,9 @@ catalogs:
     '@deepseek-ai/dsh-typert-protocol':
       specifier: ^0.1.0-rc.6
       version: 0.1.0-rc.6
+    '@deepseek-ai/dsh-workspace':
+      specifier: ^0.1.0-rc.6
+      version: 0.1.0-rc.6
     '@deepseek-ai/schemastery':
       specifier: ^3.18.1
       version: 3.18.1
@@ -101,6 +104,9 @@ importers:
       '@deepseek-ai/dsh-typert-protocol':
         specifier: ^0.1.0-rc.6
         version: 0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))
+      '@deepseek-ai/dsh-workspace':
+        specifier: ^0.1.0-rc.6
+        version: 0.1.0-rc.6(1cc52dfbc7fc17aad1b6b9c3711f64fc)
       '@deepseek-ai/schemastery':
         specifier: ^3.18.1
         version: 3.18.1
@@ -167,6 +173,9 @@ importers:
       '@deepseek-ai/dsh-typert-protocol':
         specifier: 'catalog:'
         version: 0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))
+      '@deepseek-ai/dsh-workspace':
+        specifier: 'catalog:'
+        version: 0.1.0-rc.6(1cc52dfbc7fc17aad1b6b9c3711f64fc)
       '@deepseek-ai/schemastery':
         specifier: 'catalog:'
         version: 3.18.1

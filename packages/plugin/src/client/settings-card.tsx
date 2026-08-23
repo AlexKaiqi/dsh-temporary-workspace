@@ -1,4 +1,4 @@
-/** Settings-page card for choosing the temporary Session parent directory. */
+/** Settings-page card for choosing the configurable temporary Workspace directory. */
 
 import type { ClientContext, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'

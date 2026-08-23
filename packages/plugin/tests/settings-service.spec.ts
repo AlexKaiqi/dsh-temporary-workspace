@@ -41,9 +41,20 @@ describe('TemporarySessionService settings', () => {
         pick: async () => chosenRoot,
       }),
     }
+    const attached: string[] = []
+    const workspace = {
+      id: 'temporary-workspace',
+      path: chosenRoot,
+      attachSession: async (sessionId: string) => { attached.push(sessionId) },
+    }
+    const workspaceRegistry = {
+      create: async (path: string) => ({ ...workspace, path }),
+      insertBefore: async () => [],
+    }
     const ctx = new Context()
     ctx.provide('settings', settings as never)
     ctx.provide('directoryPicker', directoryPicker as never)
+    ctx.provide('workspaceRegistry', workspaceRegistry as never)
     const service = new TemporarySessionService(ctx, { root: defaultRoot })
 
     await expect(service.describeSettings()).resolves.toMatchObject({ root: defaultRoot, defaultRoot })
@@ -54,7 +65,12 @@ describe('TemporarySessionService settings', () => {
     })
     await expect(stat(chosenRoot)).resolves.toBeDefined()
 
-    await expect(service.prepareWorkspace()).resolves.toEqual({ path: chosenRoot })
+    await expect(service.prepareWorkspace()).resolves.toEqual({ path: chosenRoot, workspaceId: 'temporary-workspace' })
+    await expect(service.attachSession({ sessionId: 'session-1' })).resolves.toEqual({
+      attached: true,
+      workspaceId: 'temporary-workspace',
+    })
+    expect(attached).toEqual(['session-1'])
 
     const reservation = await service.reserve()
     expect(reservation.path.startsWith(`${chosenRoot}/task-`)).toBe(true)

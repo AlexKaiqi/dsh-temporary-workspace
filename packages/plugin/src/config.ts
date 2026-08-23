@@ -9,7 +9,7 @@ import {
 
 /** Host configuration for scratch-directory placement. */
 export interface Config {
-  /** Durable parent directory. Defaults to `$DSH_HOME/temporary-sessions`. */
+  /** Configurable Workspace directory. Defaults to `$DSH_HOME/temporary-sessions`. */
   readonly root?: string
   /**
    * Grace before an unadopted reservation is treated as abandoned and reclaimed.

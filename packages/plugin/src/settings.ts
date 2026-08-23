@@ -17,7 +17,7 @@ export interface TemporarySessionSettings {
 
 export const TEMPORARY_SESSION_SETTINGS_NAMESPACE = settingsNamespace('temporary-session')
 
-/** Default placement preserved from the original composition-only plugin. */
+/** Default placement under DSH Home (`~/.dsh` unless DSH_HOME is overridden). */
 export const DEFAULT_TEMPORARY_SESSION_ROOT = dshHomePath('temporary-sessions')
 
 /** Persistent settings schema shared by the Host runtime and Web settings card. */

@@ -7,7 +7,7 @@ export type RemoteResult<T> =
 
 /** Minimal generated Remote face consumed by the workflow. */
 export interface TemporarySessionRemotePort {
-  prepareWorkspace: () => Promise<RemoteResult<{ path: string }>>
+  prepareWorkspace: () => Promise<RemoteResult<{ path: string, workspaceId: string }>>
 }
 
 /** Minimal Workspace service face consumed by the workflow. */

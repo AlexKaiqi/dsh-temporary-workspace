@@ -1,7 +1,7 @@
 {
   "name": "dsh-temporary-session",
-  "description": "One-click scratch sessions grouped in one fixed DeepSeek Harness Workspace",
-  "version": "0.1.0-rc.2",
+  "description": "Configurable temporary Workspace for isolated scratch Sessions in DeepSeek Harness",
+  "version": "0.1.0-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -56,8 +56,8 @@
   "dsh": {
     "inventory": {
       "summary": {
-        "zh": "一键在固定的临时 Workspace 标签下打开会话，无需选择工作目录。",
-        "en": "Opens a Session in one fixed scratch Workspace group without choosing a working directory."
+        "zh": "提供可配置的临时工作区，把一次性会话与项目隔离并统一收纳。",
+        "en": "Provides one configurable temporary Workspace that isolates and groups scratch Sessions."
       },
       "tags": [
         "session",
@@ -73,7 +73,8 @@
         "@deepseek-ai/dsh-client-ui-settings",
         "@deepseek-ai/dsh-client-ui-settings-plugins",
         "@deepseek-ai/dsh-host-directory-picker",
-        "@deepseek-ai/dsh-settings"
+        "@deepseek-ai/dsh-settings",
+        "@deepseek-ai/dsh-workspace"
       ]
     },
     "bundle": {
@@ -113,6 +114,7 @@
     "@deepseek-ai/dsh-invariants": "catalog:",
     "@deepseek-ai/dsh-settings": "catalog:",
     "@deepseek-ai/dsh-typert-protocol": "catalog:",
+    "@deepseek-ai/dsh-workspace": "catalog:",
     "react": "catalog:"
   },
   "engines": {

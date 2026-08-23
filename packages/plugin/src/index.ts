@@ -22,6 +22,8 @@ import type {
   TemporarySessionSettingsSaveRequest,
   TemporarySessionSettingsView,
   TemporarySessionWorkspace,
+  TemporaryWorkspaceSessionRef,
+  TemporaryWorkspaceSessionResult,
 } from './types.ts'
 
 declare module '@deepseek-ai/cordis' {
@@ -31,9 +33,20 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
-/** Host Remote that prepares the fixed scratch Workspace and owns legacy reservations. */
+interface TemporaryWorkspaceEntity {
+  readonly id: string
+  readonly path: string
+  attachSession(sessionId: string): Promise<void>
+}
+
+interface TemporaryWorkspaceRegistry {
+  create(path: string): Promise<TemporaryWorkspaceEntity>
+  insertBefore(workspaceId: string): Promise<readonly string[]>
+}
+
+/** Host service that prepares the configurable temporary Workspace and owns legacy reservations. */
 export class TemporarySessionService extends TypertRemoteService {
-  static inject = ['settings', 'directoryPicker']
+  static inject = ['settings', 'directoryPicker', 'workspaceRegistry']
 
   static Config: z<Config> = z.object({
     root: z.string(),
@@ -62,7 +75,19 @@ export class TemporarySessionService extends TypertRemoteService {
    */
   @Remote('prepareWorkspace')
   async prepareWorkspace(): Promise<TemporarySessionWorkspace> {
-    return this.manager(this.scope.get().root).prepareWorkspace()
+    const workspace = await this.ensureWorkspace()
+    return { path: workspace.path, workspaceId: workspace.id }
+  }
+
+  /**
+   * Account an already-created Host Session under the configured temporary
+   * Workspace. Workspace validates that the Session cwd equals the configured
+   * root, so callers cannot use this seam to relabel project Sessions.
+   */
+  async attachSession(request: TemporaryWorkspaceSessionRef): Promise<TemporaryWorkspaceSessionResult> {
+    const workspace = await this.ensureWorkspace()
+    await workspace.attachSession(request.sessionId)
+    return { attached: true, workspaceId: workspace.id }
   }
 
   /**
@@ -143,6 +168,14 @@ export class TemporarySessionService extends TypertRemoteService {
     return manager
   }
 
+  private async ensureWorkspace(): Promise<TemporaryWorkspaceEntity> {
+    const prepared = await this.manager(this.scope.get().root).prepareWorkspace()
+    const registry = (this.context as Context & { workspaceRegistry: TemporaryWorkspaceRegistry }).workspaceRegistry
+    const workspace = await registry.create(prepared.path)
+    await registry.insertBefore(workspace.id)
+    return workspace
+  }
+
   private settingsView(): TemporarySessionSettingsView {
     const descriptor = this.context.settings.describe({ redactSecrets: true })
       .find(candidate => candidate.ns === TEMPORARY_SESSION_SETTINGS_NAMESPACE)
@@ -170,5 +203,7 @@ export type {
   TemporarySessionSettingsSaveRequest,
   TemporarySessionSettingsView,
   TemporarySessionWorkspace,
+  TemporaryWorkspaceSessionRef,
+  TemporaryWorkspaceSessionResult,
 } from './types.ts'
 export default TemporarySessionService
