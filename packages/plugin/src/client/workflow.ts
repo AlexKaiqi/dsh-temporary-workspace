@@ -53,13 +53,15 @@ export async function ensureTemporaryWorkspace<WorkspaceId, SessionId>(ports: {
   readonly remote: TemporarySessionRemotePort
   readonly workspaces: TemporarySessionWorkspacePort<WorkspaceId, SessionId>
   readonly title: string
+  readonly legacyTitles?: readonly string[]
 }): Promise<TemporarySessionWorkspaceResult<WorkspaceId>> {
   const prepared = await ports.remote.prepareWorkspace()
   if (!prepared.ok) {
     throw new Error(`temporary Workspace preparation failed: ${prepared.error.code}: ${prepared.error.message}`)
   }
   const workspace = await ports.workspaces.create({ path: prepared.value.path })
-  if (workspace.title === defaultWorkspaceTitle(workspace.path) && workspace.title !== ports.title) {
+  const migratesLegacyTitle = ports.legacyTitles?.includes(workspace.title) ?? false
+  if ((workspace.title === defaultWorkspaceTitle(workspace.path) || migratesLegacyTitle) && workspace.title !== ports.title) {
     try {
       await ports.workspaces.rename(workspace.workspaceId, ports.title)
     } catch (error) {
@@ -83,6 +85,7 @@ export async function startTemporarySession<WorkspaceId, SessionId>(ports: {
   readonly workspaces: TemporarySessionWorkspacePort<WorkspaceId, SessionId>
   readonly sessions: TemporarySessionNavigationPort<SessionId>
   readonly title: string
+  readonly legacyTitles?: readonly string[]
 }): Promise<TemporarySessionStartResult<SessionId>> {
   const { workspaceId } = await ensureTemporaryWorkspace(ports)
   const sessionId = await ports.workspaces.connectWorkspace(workspaceId)

@@ -44,6 +44,17 @@ describe('ensureTemporaryWorkspace', () => {
     expect(b.workspaces.connectWorkspace).not.toHaveBeenCalled()
     expect(b.sessions.open).not.toHaveBeenCalled()
   })
+
+  it('migrates a previously shipped localized title', async () => {
+    const b = bench()
+    b.workspaces.create.mockResolvedValueOnce({
+      workspaceId: 'workspace', path: '/scratch', title: '临时会话',
+    })
+
+    await ensureTemporaryWorkspace({ ...b, legacyTitles: ['Temporary Sessions', '临时会话'] })
+
+    expect(b.workspaces.rename).toHaveBeenCalledWith('workspace', 'Temporary Workspace')
+  })
 })
 
 describe('startTemporarySession', () => {

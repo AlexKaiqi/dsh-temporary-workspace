@@ -8,7 +8,7 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import temporarySessionRemote from 'dsh-temporary-session/remote'
 import { registerTemporarySessionSettingsCard, type TemporarySessionSettingsPort } from './settings-card.tsx'
 import { ensureTemporaryWorkspace, startTemporarySession } from './workflow.ts'
-import { dictionaries, NS } from './locales.ts'
+import { dictionaries, LEGACY_TEMPORARY_WORKSPACE_TITLES, NS } from './locales.ts'
 
 export { ensureTemporaryWorkspace, startTemporarySession } from './workflow.ts'
 export type {
@@ -56,6 +56,7 @@ export async function apply(ctx: ClientContext): Promise<() => Promise<void>> {
       remote,
       workspaces: remoteCtx.workspaces,
       title: t('title'),
+      legacyTitles: LEGACY_TEMPORARY_WORKSPACE_TITLES,
     }).catch((error: unknown) => {
       console.error('[temporary-session] Workspace preparation failed:', error)
     })
@@ -67,6 +68,7 @@ export async function apply(ctx: ClientContext): Promise<() => Promise<void>> {
         workspaces: remoteCtx.workspaces,
         sessions: remoteCtx.sessions,
         title: t('title'),
+        legacyTitles: LEGACY_TEMPORARY_WORKSPACE_TITLES,
       }).then(() => undefined).catch((error: unknown) => {
         console.error('[temporary-session] creation failed:', error)
       }).finally(() => { pending = undefined })

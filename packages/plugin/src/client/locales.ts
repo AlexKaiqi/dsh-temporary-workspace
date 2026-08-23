@@ -20,6 +20,22 @@ export const en = {
 export type TemporarySessionLocaleKey = keyof typeof en
 type Dict = Record<TemporarySessionLocaleKey, string>
 
+/** Previously shipped localized Workspace titles, retained only for migration. */
+export const LEGACY_TEMPORARY_WORKSPACE_TITLES = [
+  'Temporary Sessions',
+  '临时会话',
+  '臨時工作階段',
+  '一時セッション',
+  '임시 세션',
+  'Sesiones temporales',
+  'Sessions temporaires',
+  'Temporäre Sitzungen',
+  'Sessões temporárias',
+  'Временные сеансы',
+  'الجلسات المؤقتة',
+  'अस्थायी सत्र',
+] as const
+
 export const dictionaries = {
   en,
   zh: {
