@@ -43,22 +43,22 @@ DeepSeek Harness 的可配置“临时工作区”。适合临时分析、一次
 
 ## 安装
 
-目标版本为 DeepSeek Harness `0.1.0-rc.6`：
+目标版本为 DeepSeek Harness `0.1.1-rc.2`：
 
 ```sh
 pnpm install --frozen-lockfile --ignore-scripts
 pnpm check
 pnpm pack:plugin
-dsh plugin --profile web add "$PWD/artifacts/dsh-temporary-session-0.1.0-rc.3.tgz"
+dsh plugin --profile web add "$PWD/artifacts/dsh-temporary-session-0.1.0-rc.4.tgz"
 ```
 
 发布 npm 后可安装：
 
 ```sh
-dsh plugin --profile web add 'dsh-temporary-session@0.1.0-rc.3'
+dsh plugin --profile web add 'dsh-temporary-session@0.1.0-rc.4'
 ```
 
-安装或升级后重启 DSH Web process。
+安装或升级后重启 DSH Web process。DSH 不会在后台自动更新插件；请显式执行 `dsh plugin --profile web update dsh-temporary-session`。
 
 ## 开发
 

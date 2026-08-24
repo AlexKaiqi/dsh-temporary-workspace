@@ -43,22 +43,22 @@ The same value is editable live under **Settings → Plugins → Temporary Works
 
 ## Install
 
-This release targets DeepSeek Harness `0.1.0-rc.6`:
+This release targets DeepSeek Harness `0.1.1-rc.2`:
 
 ```sh
 pnpm install --frozen-lockfile --ignore-scripts
 pnpm check
 pnpm pack:plugin
-dsh plugin --profile web add "$PWD/artifacts/dsh-temporary-session-0.1.0-rc.3.tgz"
+dsh plugin --profile web add "$PWD/artifacts/dsh-temporary-session-0.1.0-rc.4.tgz"
 ```
 
 After npm publication:
 
 ```sh
-dsh plugin --profile web add 'dsh-temporary-session@0.1.0-rc.3'
+dsh plugin --profile web add 'dsh-temporary-session@0.1.0-rc.4'
 ```
 
-Restart the DSH Web process after installation or upgrade.
+Restart the DSH Web process after installation or upgrade. DSH does not update plugins in the background; use `dsh plugin --profile web update dsh-temporary-session` explicitly.
 
 ## Development
 
