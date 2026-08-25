@@ -9,7 +9,7 @@ import {
 
 /** Host configuration for scratch-directory placement. */
 export interface Config {
-  /** Configurable Workspace directory. Defaults to `$DSH_HOME/temporary-sessions`. */
+  /** Parent for generated Workspaces. Defaults to `$DSH_HOME/temporary-workspaces`. */
   readonly root?: string
   /**
    * Grace before an unadopted reservation is treated as abandoned and reclaimed.
@@ -33,9 +33,10 @@ export interface Config {
  * @param config - host configuration.
  * @returns the absolute root directory.
  */
-export function resolveReservationRoot(config: Config): string {
-  return resolve(config.root ?? dshHomePath('temporary-sessions'))
+export function resolveTemporaryWorkspaceRoot(config: Config): string {
+  return resolve(config.root ?? dshHomePath('temporary-workspaces'))
 }
+
 
 /**
  * Resolve the reservation grace period, applying the safety floor.

@@ -1,6 +1,6 @@
 {
   "specVersion": "0.2.0",
-  "name": "dsh-temporary-session",
+  "name": "dsh-temporary-workspace",
   "pluginTypes": [
     "F3"
   ],
@@ -53,7 +53,7 @@
   },
   "contracts": [
     {
-      "name": "temporary-session-remote",
+      "name": "temporary-workspace-remote",
       "file": "packages/plugin/spec/remote-protocol.json",
       "versionField": "version"
     }

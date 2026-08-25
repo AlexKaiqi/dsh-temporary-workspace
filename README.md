@@ -1,10 +1,10 @@
-# dsh-temporary-session
+# dsh-temporary-workspace
 
 English | [中文](README.zh.md)
 
-A DeepSeek Harness plugin that keeps one configurable **Temporary Workspace** at the bottom of the Workspace list. It isolates scratch and plugin-owned background Sessions from project directories and collects them under one UI group. The default directory is `$DSH_HOME/temporary-sessions` (normally `~/.dsh/temporary-sessions`) and can be changed in Settings.
+A DeepSeek Harness **Temporary Workspace** plugin. It creates a unique child directory and Workspace below a configurable parent for every temporary task, preventing scratch Sessions from sharing files.
 
-The installable package lives in [`packages/plugin`](packages/plugin). Its README documents behavior, retention semantics, compatibility, configuration, and installation.
+The installable package lives in [packages/plugin](packages/plugin). Its README documents behavior, retention, configuration, and installation.
 
 ## Development
 

@@ -11,7 +11,7 @@ Re-audit this file whenever the rule set version changes.
 **Accepted, does not apply.** This is a candidate rule, `warn` by design and
 statistical while it is being evaluated.
 
-The plugin has exactly three operations — `reserve`, `keep`, `discard` — and they
+The plugin has four lifecycle operations — `reserve`, `adopt`, `retain`, and `discard` — and they
 are reachable only over the Typert Remote seam, by the plugin's own Client half
 reacting to a sidebar action. There is deliberately no path-taking interface: the
 opaque reservation id **is** the containment boundary
@@ -31,7 +31,7 @@ for an operator is already `rm` on a path they chose themselves.
   the root is created `0700`.
 - **CFG-002** previously could not see the single-root invariant, because path
   derivation happened inside `reservations.ts` while only `root` was declared.
-  `src/config.ts` now owns `resolveReservationRoot` and
+  `src/config.ts` now owns `resolveTemporaryWorkspaceRoot` and
   `resolveReservationRetentionMs`, both asserted directly — including that a
   relative root resolves to absolute and that a zero or negative retention is
   raised to the safety floor.

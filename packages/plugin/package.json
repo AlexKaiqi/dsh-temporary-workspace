@@ -1,9 +1,11 @@
 {
-  "name": "dsh-temporary-session",
-  "description": "Configurable temporary Workspace for isolated scratch Sessions in DeepSeek Harness",
-  "version": "0.1.0-rc.4",
+  "name": "dsh-temporary-workspace",
+  "description": "Creates an isolated temporary Workspace for every scratch task in DeepSeek Harness",
+  "version": "0.1.0-rc.5",
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "registry": "https://registry.npmjs.org/",
+    "tag": "next"
   },
   "type": "module",
   "main": "lib/index.js",
@@ -52,12 +54,30 @@
     "README.zh.md",
     "LICENSE"
   ],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "plugin",
+    "temporary-workspace",
+    "workspace",
+    "session",
+    "isolation"
+  ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AlexKaiqi/dsh-temporary-workspace.git"
+  },
+  "homepage": "https://github.com/AlexKaiqi/dsh-temporary-workspace#readme",
+  "bugs": {
+    "url": "https://github.com/AlexKaiqi/dsh-temporary-workspace/issues"
+  },
   "dsh": {
     "inventory": {
       "summary": {
-        "zh": "提供可配置的临时工作区，把一次性会话与项目隔离并统一收纳。",
-        "en": "Provides one configurable temporary Workspace that isolates and groups scratch Sessions."
+        "zh": "按配置的父目录为每个临时任务创建独立工作区。",
+        "en": "Creates one isolated Workspace per temporary task below a configurable parent."
       },
       "tags": [
         "session",

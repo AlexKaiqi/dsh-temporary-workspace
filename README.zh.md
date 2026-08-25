@@ -1,10 +1,10 @@
-# dsh-temporary-session
+# dsh-temporary-workspace
 
 [English](README.md) | 中文
 
-这是一个 DeepSeek Harness 插件：它会在工作区列表最下面准备一个可配置的 **临时工作区**，把临时会话和插件后台会话与项目目录隔离，并统一收纳到一个 UI 分组。默认目录是 `$DSH_HOME/temporary-sessions`（通常为 `~/.dsh/temporary-sessions`），可在设置中修改。
+这是一个 DeepSeek Harness **临时工作区**插件。它在可配置的父目录下，为每个临时任务自动创建独立子目录和 Workspace，避免不同临时会话共享文件。
 
-可安装的插件包位于 [`packages/plugin`](packages/plugin)。其 README 详细说明了行为、文件保留语义、兼容条件、配置和安装方式。
+可安装包位于 [packages/plugin](packages/plugin)。详细行为、保留语义、配置和安装方式见包内 README。
 
 ## 开发
 

@@ -4,11 +4,11 @@ import { WorkspaceTypertGenerator } from '@deepseek-ai/dsh-typert-generator'
 
 const workspace = resolve(import.meta.dirname, '..')
 const [artifact] = new WorkspaceTypertGenerator(workspace)
-  .generate(['dsh-temporary-session'], ['host'])
+  .generate(['dsh-temporary-workspace'], ['host'])
 
-if (artifact === undefined || artifact.package !== 'dsh-temporary-session'
+if (artifact === undefined || artifact.package !== 'dsh-temporary-workspace'
   || artifact.face !== 'host' || artifact.remote === undefined) {
-  throw new Error('temporary-session: expected one Host artifact with Remote methods')
+  throw new Error('temporary-workspace: expected one Host artifact with Remote methods')
 }
 
 const output = resolve(workspace, artifact.packageRoot, 'lib')

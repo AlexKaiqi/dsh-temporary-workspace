@@ -1,72 +1,64 @@
 {
-  "version": "1.3.0",
-  "name": "temporary-session-remote",
-  "summary": "Typert Remote protocol between the local Client half of the plugin and its Host half, primarily for preparing the configurable temporary Workspace and managing its live settings.",
-  "rationale": "This is not a DSH tool seam. The caller is the plugin's own Client running in the browser, reacting to a sidebar action, not the model. The Host keeps sole custody of the directory lifecycle so the browser can never submit a path to delete.",
+  "version": "2.0.0",
+  "name": "temporary-workspace-remote",
+  "summary": "Typert Remote protocol between the Client and Host halves of the temporary Workspace plugin.",
+  "rationale": "The browser requests opaque reservations; the Host retains sole custody of directory creation and deletion so no cleanup method accepts a caller-supplied path.",
   "transport": {
     "kind": "typert-remote",
-    "service": "temporarySessions",
+    "service": "temporaryWorkspaces",
     "resultShape": "RemoteResult<T> = { ok: true, value: T } | { ok: false, error: { code, message } }"
   },
   "capabilitySecurity": {
     "model": "opaque reservation id",
-    "description": "reserve() mints a UUID that is the only handle accepted by keep() and discard(). The settings API accepts a parent path only for validated future allocation; no cleanup method accepts a caller-supplied filesystem path, so a compromised or buggy Client cannot address an arbitrary directory for deletion.",
-    "verifiedBy": "packages/plugin/tests/reservations.spec.ts asserts that a path-like string passed to discard() resolves to { found: false } and removes nothing."
+    "description": "reserve() mints a UUID that is the only handle accepted by adopt(), retain(), and discard(). The settings API accepts a parent path only for validated future allocation; no cleanup method accepts a caller-supplied filesystem path.",
+    "verifiedBy": "packages/plugin/tests/reservations.spec.ts verifies containment, opaque-id deletion, symlink resistance, and crash recovery."
   },
   "methods": {
-    "prepareWorkspace": {
-      "params": {},
-      "returns": "{ path: string, workspaceId: string }",
-      "effect": "Creates the configured root with private mode when necessary, creates or resolves its durable Workspace registration, keeps that Workspace last in display order, sweeps abandoned legacy reservations, and returns the same Workspace identity on every call."
-    },
     "reserve": {
       "params": {},
       "returns": "{ reservationId: string, path: string }",
-      "effect": "Legacy-compatible path: creates a unique directory under the configured root, marked pending, and sweeps abandoned reservations first. The current Client does not call this method."
+      "effect": "Creates a unique workspace-* child below the configured parent, writes a pending marker, and sweeps abandoned reservations first."
     },
-    "keep": {
+    "adopt": {
+      "params": "{ reservationId: string, sessionId: string }",
+      "returns": "{ found: boolean, workspaceId?: string }",
+      "effect": "Registers the reserved path as a Workspace, validates and attaches the created Session, moves the Workspace to the end, and clears its pending marker."
+    },
+    "retain": {
       "params": "{ reservationId: string }",
       "returns": "{ found: boolean }",
-      "effect": "Retires the reservation and clears its pending marker. The directory becomes durable because a Session has adopted it and may be resumed later."
+      "effect": "Clears the pending marker without attaching a Session. Used only when rollback cannot remove a Workspace registration and deleting its directory would be unsafe."
     },
     "discard": {
       "params": "{ reservationId: string }",
       "returns": "{ found: boolean }",
-      "effect": "Removes a reservation that no Session adopted. Idempotent: a retired or unknown id reports found: false."
+      "effect": "Removes an unadopted reservation. Idempotent: a retired or unknown id reports found: false."
     },
     "describeSettings": {
       "params": {},
       "returns": "{ revision, writable, pickerSupported, defaultRoot, root }",
-      "effect": "Returns the revision-fenced live root setting used by the Web settings card."
+      "effect": "Returns the revision-fenced live parent-directory setting used by the Web settings card."
     },
     "saveSettings": {
       "params": "{ expectedRevision: number, root: string }",
       "returns": "{ revision, writable, pickerSupported, defaultRoot, root }",
-      "effect": "Normalizes an absolute non-filesystem-root path, creates and permission-checks it, persists it through DSH Settings, and makes it the fixed Workspace used by future temporary Sessions."
+      "effect": "Normalizes an absolute non-filesystem-root path, creates and permission-checks it, persists it through DSH Settings, and uses it for future reservations."
     },
     "pickRoot": {
       "params": {},
       "returns": "{ supported: boolean, path: string | null }",
-      "effect": "Uses the Host-native directory-picker capability when available. A null path is cancellation; browse-only deployments report supported: false and keep manual absolute-path entry."
-    }
-  },
-  "hostService": {
-    "attachSession": {
-      "params": "{ sessionId: string }",
-      "returns": "{ attached: true, workspaceId: string }",
-      "effect": "Attaches an already-created Session to the configured temporary Workspace. The Workspace domain accepts it only when the Session header cwd exactly matches the configured root, preventing project Sessions from being relabelled. This Host-only composition seam is consumed by background products such as model portrait collection and is not exposed as a browser Remote method."
+      "effect": "Uses the Host-native directory picker when available. A null path is cancellation."
     }
   },
   "lifecycle": {
-    "currentFlow": "All new temporary Sessions and plugin-owned background Sessions share one durable Workspace rooted at configuration.root, so the sidebar contains one Temporary Workspace group instead of an Ungrouped row per task.",
-    "tradeoff": "Workspace membership requires Session cwd to equal the Workspace canonical path. Consequently the fixed-group design shares one scratch filesystem root across temporary Sessions; per-Session cwd isolation and one fixed Workspace group cannot both be represented by the current Host contract.",
-    "durability": "The fixed Workspace root and every legacy adopted directory are never reclaimed. Deleting either would invalidate a historical Session's cwd, and Harness has no directory lifecycle tied to Session deletion.",
-    "crashWindow": "The reservation id lives only in Host memory. A Host that dies between reserve and keep/discard leaves a directory no id can address, so each unadopted reservation carries an on-disk pending marker.",
-    "reclamation": "A sweep runs on service construction and again on each reserve(). It removes only directories that still carry the pending marker, are not live in the current process, and whose marker is older than reservationRetentionMs.",
-    "graceRationale": "Reservations in flight on a concurrent Host are invisible to this process, so anything younger than the grace period is left alone. The configured value is raised to a one-minute floor."
+    "currentFlow": "Every creation action reserves a new child, registers that child as its own Workspace, creates and opens one Session in it, then adopts the reservation.",
+    "isolation": "Each invocation receives a distinct canonical cwd. Blank-session reuse remains confined to the newly created Workspace and cannot cross task boundaries.",
+    "durability": "Adopted Workspace directories are retained because deleting them would invalidate historical Session cwd values.",
+    "crashWindow": "A Host crash between reserve and adopt/retain/discard leaves a pending marker. A later sweep reclaims only markers older than reservationRetentionMs.",
+    "rollback": "Registration failure discards the child. Session creation failure deregisters the Workspace and discards the child; if deregistration fails, retain preserves the directory beneath the live registration."
   },
   "configuration": {
-    "root": "Configurable durable Workspace directory and composition-layer reset value; defaults to $DSH_HOME/temporary-sessions (normally ~/.dsh/temporary-sessions). The Settings page stores a live user override.",
-    "reservationRetentionMs": "Grace before an unadopted reservation is treated as abandoned; defaults to 3600000, floor 60000."
+    "root": "Configurable parent directory; defaults to $DSH_HOME/temporary-workspaces. The Settings namespace is temporary-workspace.",
+    "reservationRetentionMs": "Grace before an unadopted reservation is treated as abandoned; defaults to 3600000 and has a 60000 floor."
   }
 }

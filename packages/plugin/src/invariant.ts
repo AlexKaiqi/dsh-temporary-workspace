@@ -1,12 +1,12 @@
-/** Package-owned invariant companion for the temporary Session plugin. */
+/** Package-owned invariant companion for the temporary Workspace plugin. */
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
 
-const PACKAGE_NAME = 'dsh-temporary-session'
+const PACKAGE_NAME = 'dsh-temporary-workspace'
 
 /** Cordis companion plugin name. */
-export const name = 'temporary-session-invariant'
+export const name = 'temporary-workspace-invariant'
 /** Service required before reserving package ownership. */
 export const inject = ['invariants']
 

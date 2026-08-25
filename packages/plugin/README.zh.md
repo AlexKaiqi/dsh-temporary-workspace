@@ -1,45 +1,49 @@
-# dsh-temporary-session
+# dsh-temporary-workspace
 
 [English](README.md) | 中文
 
-DeepSeek Harness 的可配置“临时工作区”。适合临时分析、一次性任务和插件后台工作：它们与项目目录隔离，并统一收纳到工作区列表最下面的一个分组，不再散落到“未分组”。需要进入具体项目时，继续使用页面已有的普通 Workspace 入口。
-
-当侧栏额外提供 `sidebar/new-session` 扩展事件时，插件仍兼容该旧入口；当前侧栏不再添加重复的底部按钮。
+DeepSeek Harness 的可配置**临时工作区**。适合临时分析、一次性任务和插件后台工作：每次创建都会获得独立目录，不会与项目目录或其他临时任务共享文件。
 
 ## 行为
 
-插件启动后会完成一笔幂等的准备流程：
+每次点击侧栏的“临时工作区”后，插件执行一笔带回滚的创建流程：
 
-1. Host 创建并检查固定目录 `$DSH_HOME/temporary-sessions`（可配置）。
-2. Host 用 Harness 原生 Workspace API 幂等注册这个目录；Client 把默认目录名本地化为“临时工作区”，用户之后手动改过的标题不会被覆盖。
-3. Client 把该特殊 Workspace 固定移动到普通工作区之后；它使用宿主工作区行自带的新建入口，不再额外注册侧栏底部按钮。
-4. 通过该分组新建时，宿主会复用已有空白 Session，或在上一条已有内容后创建新 Session；这些 Session 的 `cwd` 都是该固定目录，因此自然归在同一个 Workspace 标签下。
-5. Workspace、目录和 Session 日志持续保留，因此历史会话可以恢复，普通会话列表也不会再被临时会话冲散。
+1. Host 在配置的父目录下用 `mkdtemp` 创建唯一的 `workspace-*` 子目录。
+2. Client 将该子目录注册为普通 Workspace，并放到工作区列表末尾。
+3. 插件为 Workspace 创建并打开首个 Session。这个 Session 的 `cwd` 就是该唯一子目录。
+4. 创建成功后清除待采用标记；注册或 Session 创建失败时回滚 Workspace 和子目录。
+5. 每次点击都会从新的子目录开始，所以空白 Session 复用不会跨临时任务发生。
 
-“临时”指任务不绑定已有项目，不代表 Workspace、Session 或文件在关闭后自动销毁。Harness 当前没有与 Session 删除绑定的目录生命周期；自动删除会让历史会话的 `cwd` 失效，因此插件有意保留这个固定 Workspace 及其中的文件。
+生成的 Workspace 会保留，并显示为“临时工作区 · workspace-…”；用户之后可以正常改名。这里的“临时”表示不绑定已有项目，并不表示关闭后立即删除。已采用目录必须保留，否则历史 Session 的 `cwd` 会失效。
 
-固定分组有一个明确取舍：Harness 只允许 `cwd` 与 Workspace 规范路径完全相同的 Session 归入该 Workspace，所以同组临时会话共用一个文件目录，不能同时拥有各自独立的 `task-*` cwd。需要目录隔离的项目任务应继续使用普通 Workspace 入口。
-
-为兼容旧版本并清理其崩溃遗留，Host 暂时保留 reservation 协议和带标记目录的安全 sweep；当前 Client 不再为新会话创建这些子目录。已被旧 Session 采用的目录没有标记，仍然永远不会被回收。
+Host 会清理创建过程中因进程崩溃遗留、且超过宽限期的未采用目录；已被 Workspace 采用的目录没有待处理标记，不会被这项清理误删。
 
 ## 配置
 
-组合补丁默认使用：
+`root` 是生成临时 Workspace 的**父目录**，不是多个会话共用的 Workspace：
 
 ```yaml
 - insert:
-    - id: temporary-session
-      name: dsh-temporary-session
+    - id: temporary-workspace
+      name: dsh-temporary-workspace
       config:
-        root: !!js dshHomePath('temporary-sessions')
+        root: !!js dshHomePath('temporary-workspaces')
         reservationRetentionMs: 3600000
 ```
 
-可以把 `root` 改为其他 Host 本地绝对路径。这个路径就是临时会话共用的固定 Workspace，而不是每个任务的父目录。
+默认值是 `$DSH_HOME/temporary-workspaces`，通常为 `~/.dsh/temporary-workspaces`。也可在 **设置 → 插件 → 临时工作区** 中实时修改；保存后只影响后续创建，既有 Workspace、Session 和文件不会迁移或删除。
 
-同一个值可在 **设置 → 插件 → 临时工作区** 中实时编辑。页面支持输入绝对路径；Host 使用原生目录选择后端时，还会显示 **选择目录** 按钮。保存时会创建并检查目录权限，下一次新建临时会话会注册并使用新 Workspace；旧 Workspace、既有 Session 和文件不会迁移或删除。点击 **使用默认地址** 会恢复组合层的值；profile 未覆盖 `root` 时就是 `$DSH_HOME/temporary-sessions`（通常为 `~/.dsh/temporary-sessions`）。
+Settings namespace 为 `temporary-workspace`。`reservationRetentionMs` 是未采用目录的回收宽限期，默认一小时，最小一分钟。
 
-`reservationRetentionMs` 是*尚未采用*的预留被判定为废弃前的宽限期，默认一小时。宽限期是必要的：并发 Host 正在进行中的预留对本进程不可见，因此更年轻的目录一律不动。小于一分钟的取值会被抬升到该下界。
+## 插件对接
+
+需要创建后台 Session 的插件应注入 `temporaryWorkspaces`，并遵循同一套所有权事务：
+
+1. 调用 `reserve()`，把返回的 `path` 作为新 Session 的 `cwd`。
+2. Session 创建后调用 `adopt({ reservationId, sessionId })`，将目录注册为独立 Workspace 并绑定 Session。
+3. 如果 Session 创建前失败，调用 `discard({ reservationId })`；如果 Session 已存在但采用流程未能完成，调用 `retain({ reservationId })`，避免崩溃回收误删仍在使用的 `cwd`。
+
+Reservation ID 是不透明能力标识；清理接口不接受调用方提供的路径。
 
 ## 安装
 
@@ -49,16 +53,18 @@ DeepSeek Harness 的可配置“临时工作区”。适合临时分析、一次
 pnpm install --frozen-lockfile --ignore-scripts
 pnpm check
 pnpm pack:plugin
-dsh plugin --profile web add "$PWD/artifacts/dsh-temporary-session-0.1.0-rc.4.tgz"
+dsh plugin --profile web add "$PWD/artifacts/dsh-temporary-workspace-0.1.0-rc.5.tgz"
 ```
 
 发布 npm 后可安装：
 
 ```sh
-dsh plugin --profile web add 'dsh-temporary-session@0.1.0-rc.4'
+dsh plugin --profile web add 'dsh-temporary-workspace@0.1.0-rc.5'
 ```
 
-安装或升级后重启 DSH Web process。DSH 不会在后台自动更新插件；请显式执行 `dsh plugin --profile web update dsh-temporary-session`。
+预发布版本使用 npm `next` tag。
+
+安装或升级后重启 DSH Web process。
 
 ## 开发
 

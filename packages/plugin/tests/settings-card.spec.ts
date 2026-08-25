@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
-import { TemporarySessionSettingsController } from '../src/client/settings-card.tsx'
+import { TemporaryWorkspaceSettingsController } from '../src/client/settings-card.tsx'
 
-describe('TemporarySessionSettingsController', () => {
+describe('TemporaryWorkspaceSettingsController', () => {
   it('loads, picks, and revision-fences a live root save', async () => {
     const initial = {
       revision: 3,
       writable: true,
       pickerSupported: true,
-      defaultRoot: '/default/temporary-sessions',
-      root: '/default/temporary-sessions',
+      defaultRoot: '/default/temporary-workspaces',
+      root: '/default/temporary-workspaces',
     }
     const remote = {
       describeSettings: vi.fn(async () => ({ ok: true as const, value: initial })),
@@ -21,18 +21,18 @@ describe('TemporarySessionSettingsController', () => {
         value: { ...initial, revision: 4, root: '/chosen/scratch' },
       })),
     }
-    const controller = new TemporarySessionSettingsController(remote, key => key)
+    const controller = new TemporaryWorkspaceSettingsController(remote, key => key)
     const face = controller.inject()
-    await vi.waitFor(() => { expect(face.hooks.temporarySessionSettings.getSnapshot().status).toBe('ready') })
+    await vi.waitFor(() => { expect(face.hooks.temporaryWorkspaceSettings.getSnapshot().status).toBe('ready') })
 
     face.pick()
     await vi.waitFor(() => {
-      expect(face.hooks.temporarySessionSettings.getSnapshot().draftRoot).toBe('/chosen/scratch')
+      expect(face.hooks.temporaryWorkspaceSettings.getSnapshot().draftRoot).toBe('/chosen/scratch')
     })
     face.save()
     await vi.waitFor(() => {
       expect(remote.saveSettings).toHaveBeenCalledWith({ expectedRevision: 3, root: '/chosen/scratch' })
-      expect(face.hooks.temporarySessionSettings.getSnapshot()).toMatchObject({
+      expect(face.hooks.temporaryWorkspaceSettings.getSnapshot()).toMatchObject({
         revision: 4,
         persistedRoot: '/chosen/scratch',
       })

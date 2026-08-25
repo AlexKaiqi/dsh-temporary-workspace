@@ -1,86 +1,59 @@
-/** Browser half: prepare the fixed temporary Workspace and its settings UI. */
+/** Browser half: create isolated temporary Workspaces and expose their settings UI. */
 
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-import temporarySessionRemote from 'dsh-temporary-session/remote'
-import { registerTemporarySessionSettingsCard, type TemporarySessionSettingsPort } from './settings-card.tsx'
-import { ensureTemporaryWorkspace, startTemporarySession } from './workflow.ts'
-import { dictionaries, LEGACY_TEMPORARY_WORKSPACE_TITLES, NS } from './locales.ts'
+import temporaryWorkspaceRemote from 'dsh-temporary-workspace/remote'
+import { registerTemporaryWorkspaceSettingsCard, type TemporaryWorkspaceSettingsPort } from './settings-card.tsx'
+import { registerTemporaryWorkspaceSidebarAction } from './sidebar-action.tsx'
+import { startTemporaryWorkspace } from './workflow.ts'
+import { dictionaries, NS } from './locales.ts'
 
-export { ensureTemporaryWorkspace, startTemporarySession } from './workflow.ts'
+export { startTemporaryWorkspace } from './workflow.ts'
 export type {
-  TemporarySessionNavigationPort,
-  TemporarySessionRemotePort,
-  TemporarySessionStartResult,
-  TemporarySessionWorkspacePort,
-  TemporarySessionWorkspaceResult,
+  TemporaryWorkspaceDiagnostics,
+  TemporaryWorkspaceNavigationPort,
+  TemporaryWorkspaceRegistryPort,
+  TemporaryWorkspaceRemotePort,
+  TemporaryWorkspaceStartResult,
 } from './workflow.ts'
-
-// Kept here as well as in the compatible ui-sidebar contract so the plugin
-// can be built against the rc.6 public packages while targeting the patched
-// shell that emits this event.
-declare module '@deepseek-ai/cordis' {
-  interface Events {
-    /** @mode bail */
-    'sidebar/new-session'(): true | void
-  }
-}
 
 /** Runtime services used by the action and generated Remote contribution. */
 export const inject = ['remote', 'workspaces', 'sessions', 'slots', 'locale']
 
 /**
- * Mount the Remote descriptor, prepare the Workspace row, and retain the
- * optional legacy unscoped New Session seam.
+ * Mount the Remote descriptor and register the dedicated creation action.
  * @param ctx - Client Cordis root carrying Remote, Workspace, and Session services.
  * @returns disposer for the generated Remote contribution.
  */
 export async function apply(ctx: ClientContext): Promise<() => Promise<void>> {
-  ctx.effect(() => ctx.locale.register(NS, dictionaries), 'temporary-session: locale dictionaries')
+  ctx.effect(() => ctx.locale.register(NS, dictionaries), 'temporary-workspace: locale dictionaries')
   const t = ctx.locale.bind(NS)
-  const disposeRemote = await ctx.remote.$mount(temporarySessionRemote)
-  const featureFiber = ctx.inject(['remote.temporarySessions'], (remoteCtx) => {
-    const remote = remoteCtx.remote.temporarySessions
-    registerTemporarySessionSettingsCard(
+  const disposeRemote = await ctx.remote.$mount(temporaryWorkspaceRemote)
+  const featureFiber = ctx.inject(['remote.temporaryWorkspaces'], (remoteCtx) => {
+    const remote = remoteCtx.remote.temporaryWorkspaces
+    registerTemporaryWorkspaceSettingsCard(
       remoteCtx,
-      remote as unknown as TemporarySessionSettingsPort,
+      remote as unknown as TemporaryWorkspaceSettingsPort,
       t,
     )
 
-    // The standard Workspace row already owns its New Session control. Ensure
-    // that row exists on startup and keep this special-purpose group last.
-    void ensureTemporaryWorkspace({
-      remote,
-      workspaces: remoteCtx.workspaces,
-      title: t('title'),
-      legacyTitles: LEGACY_TEMPORARY_WORKSPACE_TITLES,
-    }).catch((error: unknown) => {
-      console.error('[temporary-session] Workspace preparation failed:', error)
-    })
-
     let pending: Promise<void> | undefined
     const start = (): Promise<void> => {
-      pending ??= startTemporarySession({
+      pending ??= startTemporaryWorkspace({
         remote,
         workspaces: remoteCtx.workspaces,
         sessions: remoteCtx.sessions,
         title: t('title'),
-        legacyTitles: LEGACY_TEMPORARY_WORKSPACE_TITLES,
       }).then(() => undefined).catch((error: unknown) => {
-        console.error('[temporary-session] creation failed:', error)
+        console.error('[temporary-workspace] creation failed:', error)
       }).finally(() => { pending = undefined })
       return pending
     }
 
-    // Older patched shells may also offer the original unscoped New Session
-    // interception seam. Current shells use the fixed Workspace row above.
-    remoteCtx.on('sidebar/new-session', () => {
-      void start()
-      return true
-    })
+    registerTemporaryWorkspaceSidebarAction(remoteCtx, start, t)
   })
   await featureFiber
 

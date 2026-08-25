@@ -1,17 +1,17 @@
 {
-  "name": "dsh-temporary-session-workspace",
+  "name": "dsh-temporary-workspace-monorepo",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.7.0",
   "scripts": {
     "build": "pnpm run clean && pnpm run build:host && pnpm run build:client",
-    "build:host": "tsc -b tsconfig.host.json && pnpm --filter dsh-temporary-session exec tsdown --env.DSH_BUILD_FACE host && node scripts/generate-typert.mjs",
-    "build:client": "tsc -b tsconfig.client.json && pnpm --filter dsh-temporary-session exec tsdown --env.DSH_BUILD_FACE client",
+    "build:host": "tsc -b tsconfig.host.json && pnpm --filter dsh-temporary-workspace exec tsdown --env.DSH_BUILD_FACE host && node scripts/generate-typert.mjs",
+    "build:client": "tsc -b tsconfig.client.json && pnpm --filter dsh-temporary-workspace exec tsdown --env.DSH_BUILD_FACE client",
     "clean": "tsc -b tsconfig.host.json tsconfig.client.json --clean && node scripts/clean.mjs",
     "typecheck": "pnpm run build:host && tsc -b tsconfig.client.json --pretty false",
     "test": "vitest run",
     "check": "pnpm run build && pnpm run test",
-    "pack:plugin": "pnpm --filter dsh-temporary-session pack --pack-destination artifacts"
+    "pack:plugin": "pnpm --filter dsh-temporary-workspace pack --pack-destination artifacts"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",

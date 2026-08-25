@@ -1,19 +1,19 @@
-/** Safe lifecycle owner for not-yet-adopted scratch directories. */
+/** Safe lifecycle owner for not-yet-adopted temporary Workspace directories. */
 
 import { randomUUID } from 'node:crypto'
 import type { Dirent } from 'node:fs'
 import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import type {
-  TemporarySessionReservation,
-  TemporarySessionReservationResult,
-  TemporarySessionSweepResult,
+  TemporaryWorkspaceReservation,
+  TemporaryWorkspaceReservationResult,
+  TemporaryWorkspaceSweepResult,
 } from './types.ts'
 
 /**
  * Marker naming an outstanding, not-yet-adopted reservation.
  *
- * Written when the directory is reserved and removed when a Session adopts it,
+ * Written when the directory is reserved and removed when a Workspace adopts it,
  * so the marker's presence is exactly the crash window: if the Host dies between
  * `reserve` and `keep`/`discard`, the in-memory reservation id is lost and the
  * directory would otherwise be unreachable forever. Adopted directories carry no
@@ -21,8 +21,8 @@ import type {
  */
 const PENDING_MARKER = '.reservation-pending'
 
-/** Prefix given to every reserved directory by `mkdtemp`. */
-const RESERVATION_PREFIX = 'task-'
+/** Prefix given to every new reserved directory by `mkdtemp`. */
+const RESERVATION_PREFIX = 'workspace-'
 
 /** Default grace before an unadopted reservation is treated as abandoned. */
 export const DEFAULT_RESERVATION_RETENTION_MS = 3_600_000
@@ -31,7 +31,7 @@ export const DEFAULT_RESERVATION_RETENTION_MS = 3_600_000
 export const MIN_RESERVATION_RETENTION_MS = 60_000
 
 /** Creates unique scratch directories and allows only opaque-id cleanup. */
-export class TemporaryDirectoryReservations {
+export class TemporaryWorkspaceReservations {
   private readonly pending = new Map<string, string>()
   readonly root: string
   /** Grace before an unadopted reservation is considered abandoned. */
@@ -47,15 +47,8 @@ export class TemporaryDirectoryReservations {
     this.retentionMs = Math.max(MIN_RESERVATION_RETENTION_MS, retentionMs)
   }
 
-  /**
-   * Ensure the durable scratch root exists for the fixed temporary Workspace.
-   *
-   * The current product flow reuses this root directly. The reservation
-   * methods remain for protocol compatibility and abandoned-directory cleanup
-   * from older plugin versions.
-   * @returns the absolute scratch root.
-   */
-  async prepareWorkspace(): Promise<{ readonly path: string }> {
+  /** Ensure the durable parent for generated temporary Workspaces exists. */
+  async prepareRoot(): Promise<{ readonly path: string }> {
     await mkdir(this.root, { recursive: true, mode: 0o700 })
     await this.sweepAbandoned().catch(() => undefined)
     return { path: this.root }
@@ -69,8 +62,8 @@ export class TemporaryDirectoryReservations {
    *
    * @returns the opaque reservation id and its new absolute path.
    */
-  async reserve(): Promise<TemporarySessionReservation> {
-    await this.prepareWorkspace()
+  async reserve(): Promise<TemporaryWorkspaceReservation> {
+    await this.prepareRoot()
     const path = await mkdtemp(join(this.root, RESERVATION_PREFIX))
     const reservationId = randomUUID()
     // Marked before the id is handed out, so a crash at any later instant leaves
@@ -80,17 +73,22 @@ export class TemporaryDirectoryReservations {
     return { reservationId, path }
   }
 
+  /** Resolve a live opaque reservation without exposing path-based mutation. */
+  pathOf(reservationId: string): string | undefined {
+    return this.pending.get(reservationId)
+  }
+
   /**
-   * Retire a reservation after a Session has adopted its directory. The
-   * directory remains because the Session may be resumed later.
+   * Retire a reservation after a Workspace has adopted its directory. The
+   * directory remains because its Session may be resumed later.
    * @param reservationId - opaque id minted by `reserve`.
    * @returns whether the reservation was still live.
    */
-  async keep(reservationId: string): Promise<TemporarySessionReservationResult> {
+  async keep(reservationId: string): Promise<TemporaryWorkspaceReservationResult> {
     const path = this.pending.get(reservationId)
     if (path === undefined) return { found: false }
     // Clearing the marker is what makes the directory durable: it is now owned
-    // by a Session, so no future sweep may reclaim it.
+    // by a Workspace, so no future sweep may reclaim it.
     await rm(join(path, PENDING_MARKER), { force: true })
     this.pending.delete(reservationId)
     return { found: true }
@@ -101,7 +99,7 @@ export class TemporaryDirectoryReservations {
    * @param reservationId - opaque id minted by `reserve`.
    * @returns whether the reservation was still live and removed.
    */
-  async discard(reservationId: string): Promise<TemporarySessionReservationResult> {
+  async discard(reservationId: string): Promise<TemporaryWorkspaceReservationResult> {
     const path = this.pending.get(reservationId)
     if (path === undefined) return { found: false }
     this.pending.delete(reservationId)
@@ -119,14 +117,14 @@ export class TemporaryDirectoryReservations {
    *
    * Only directories that still carry the pending marker, are not live in THIS
    * process, and whose marker is older than {@link retentionMs} are removed.
-   * Adopted directories have no marker, so a resumable Session is never
+   * Adopted directories have no marker, so a resumable Workspace is never
    * destroyed; the grace period protects reservations owned by a concurrent Host
    * whose in-memory set this process cannot see.
    *
    * @param now - current epoch milliseconds; injectable for tests.
    * @returns how many abandoned reservations were reclaimed.
    */
-  async sweepAbandoned(now: number = Date.now()): Promise<TemporarySessionSweepResult> {
+  async sweepAbandoned(now: number = Date.now()): Promise<TemporaryWorkspaceSweepResult> {
     let entries: Dirent[]
     try {
       entries = await readdir(this.root, { withFileTypes: true })
@@ -145,7 +143,7 @@ export class TemporaryDirectoryReservations {
       try {
         markerAge = now - (await stat(join(path, PENDING_MARKER))).mtimeMs
       } catch {
-        // No marker: adopted by a Session, or not ours. Leave it alone.
+        // No marker: adopted by a Workspace, or not ours. Leave it alone.
         continue
       }
       if (markerAge < this.retentionMs) continue

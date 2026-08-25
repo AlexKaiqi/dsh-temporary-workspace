@@ -1,48 +1,40 @@
-/** A Host-owned scratch directory that has not yet been adopted by a Session. */
-export interface TemporarySessionReservation {
-  /** Opaque capability used only to keep or discard this reservation. */
+/** A Host-owned directory not yet adopted by a temporary Workspace. */
+export interface TemporaryWorkspaceReservation {
+  /** Opaque capability used only to adopt, retain, or discard this reservation. */
   readonly reservationId: string
   /** Absolute Host path that the ordinary Workspace API can adopt. */
   readonly path: string
 }
 
-/** Fixed scratch Workspace prepared by the Host for every temporary Session. */
-export interface TemporarySessionWorkspace {
-  /** Absolute Host path registered once and reused as one Workspace group. */
-  readonly path: string
-  /** Durable Workspace identity used to account every temporary Session. */
-  readonly workspaceId: string
-}
-
-/** Existing Session to account under the configured temporary Workspace. */
-export interface TemporaryWorkspaceSessionRef {
-  readonly sessionId: string
-}
-
-/** Result after a Session has been durably attached to the temporary Workspace. */
-export interface TemporaryWorkspaceSessionResult {
-  readonly attached: true
-  readonly workspaceId: string
-}
-
-/** Reference to one outstanding scratch-directory reservation. */
-export interface TemporarySessionReservationRef {
+/** Reference to one outstanding temporary-Workspace reservation. */
+export interface TemporaryWorkspaceReservationRef {
   readonly reservationId: string
 }
 
+/** A created Session adopting the reserved directory as its Workspace. */
+export interface TemporaryWorkspaceAdoptionRef extends TemporaryWorkspaceReservationRef {
+  readonly sessionId: string
+}
+
+/** Result of registering and attaching an adopted temporary Workspace. */
+export interface TemporaryWorkspaceAdoptionResult {
+  readonly found: boolean
+  readonly workspaceId?: string
+}
+
 /** Result of retiring one outstanding reservation. */
-export interface TemporarySessionReservationResult {
+export interface TemporaryWorkspaceReservationResult {
   readonly found: boolean
 }
 
 /** Result of reclaiming reservations abandoned by a crashed Host process. */
-export interface TemporarySessionSweepResult {
-  /** How many abandoned reservation directories were removed. */
+export interface TemporaryWorkspaceSweepResult {
+  /** How many abandoned reservations were reclaimed. */
   readonly reclaimed: number
 }
 
 /** Revision-fenced settings view consumed by the Web plugin card. */
-export interface TemporarySessionSettingsView {
+export interface TemporaryWorkspaceSettingsView {
   readonly revision: number
   readonly writable: boolean
   readonly pickerSupported: boolean
@@ -51,13 +43,13 @@ export interface TemporarySessionSettingsView {
 }
 
 /** One full settings save from the Web card. */
-export interface TemporarySessionSettingsSaveRequest {
+export interface TemporaryWorkspaceSettingsSaveRequest {
   readonly expectedRevision: number
   readonly root: string
 }
 
 /** Native directory-picker outcome; null means the operator cancelled. */
-export interface TemporarySessionRootPickResult {
+export interface TemporaryWorkspaceRootPickResult {
   readonly supported: boolean
   readonly path: string | null
 }

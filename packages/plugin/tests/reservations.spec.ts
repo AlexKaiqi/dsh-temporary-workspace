@@ -2,9 +2,9 @@ import { mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, utimes, writeFil
 import { tmpdir } from 'node:os'
 import { isAbsolute, join, relative } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { DEFAULT_RESERVATION_RETENTION_MS, MIN_RESERVATION_RETENTION_MS, TemporaryDirectoryReservations } from '../src/reservations.ts'
-import { resolveReservationRetentionMs, resolveReservationRoot } from '../src/config.ts'
-import { DEFAULT_TEMPORARY_SESSION_ROOT, normalizeTemporarySessionRoot } from '../src/settings.ts'
+import { DEFAULT_RESERVATION_RETENTION_MS, MIN_RESERVATION_RETENTION_MS, TemporaryWorkspaceReservations } from '../src/reservations.ts'
+import { resolveReservationRetentionMs, resolveTemporaryWorkspaceRoot } from '../src/config.ts'
+import { DEFAULT_TEMPORARY_WORKSPACE_ROOT, normalizeTemporaryWorkspaceRoot } from '../src/settings.ts'
 
 const roots: string[] = []
 
@@ -12,18 +12,18 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map(path => rm(path, { recursive: true, force: true })))
 })
 
-async function store(): Promise<TemporaryDirectoryReservations> {
-  const parent = await mkdtemp(join(tmpdir(), 'dsh-temporary-session-test-'))
+async function store(): Promise<TemporaryWorkspaceReservations> {
+  const parent = await mkdtemp(join(tmpdir(), 'dsh-temporary-workspace-test-'))
   roots.push(parent)
-  return new TemporaryDirectoryReservations(join(parent, 'scratch'))
+  return new TemporaryWorkspaceReservations(join(parent, 'scratch'))
 }
 
-describe('TemporaryDirectoryReservations', () => {
-  it('prepares one fixed private Workspace root without creating a task child', async () => {
+describe('TemporaryWorkspaceReservations', () => {
+  it('prepares one private parent without creating a Workspace child', async () => {
     const reservations = await store()
 
-    await expect(reservations.prepareWorkspace()).resolves.toEqual({ path: reservations.root })
-    await expect(reservations.prepareWorkspace()).resolves.toEqual({ path: reservations.root })
+    await expect(reservations.prepareRoot()).resolves.toEqual({ path: reservations.root })
+    await expect(reservations.prepareRoot()).resolves.toEqual({ path: reservations.root })
     expect((await stat(reservations.root)).isDirectory()).toBe(true)
     expect((await stat(reservations.root)).mode & 0o777).toBe(0o700)
   })
@@ -35,7 +35,7 @@ describe('TemporaryDirectoryReservations', () => {
 
     expect(first.reservationId).not.toBe(second.reservationId)
     expect(first.path).not.toBe(second.path)
-    expect(first.path.startsWith(`${reservations.root}/task-`)).toBe(true)
+    expect(first.path.startsWith(`${reservations.root}/workspace-`)).toBe(true)
     expect((await stat(first.path)).isDirectory()).toBe(true)
     expect((await stat(second.path)).isDirectory()).toBe(true)
   })
@@ -67,7 +67,7 @@ describe('TemporaryDirectoryReservations', () => {
     // A crashed Host loses `pending`, so the reservation id no longer exists
     // anywhere. Model that with a fresh instance over the same root: without a
     // sweep this directory is unreachable forever.
-    const restarted = new TemporaryDirectoryReservations(reservations.root)
+    const restarted = new TemporaryWorkspaceReservations(reservations.root)
     await expect(restarted.discard(abandoned.reservationId)).resolves.toEqual({ found: false })
 
     // Inside the grace period it is left alone: a concurrent Host may own it.
@@ -89,7 +89,7 @@ describe('TemporaryDirectoryReservations', () => {
     // `keep` clears the pending marker, which is what makes the directory
     // durable. Sweeping far in the future must not touch it, or resuming a
     // Session would find its workspace deleted.
-    const restarted = new TemporaryDirectoryReservations(reservations.root)
+    const restarted = new TemporaryWorkspaceReservations(reservations.root)
     const farFuture = Date.now() + restarted.retentionMs * 100
     expect(await restarted.sweepAbandoned(farFuture)).toEqual({ reclaimed: 0 })
     await expect(stat(adopted.path)).resolves.toBeDefined()
@@ -116,7 +116,7 @@ describe('TemporaryDirectoryReservations', () => {
 
     // A restarted Host reclaims on its first allocation, so orphans do not
     // accumulate for the lifetime of the installation.
-    const restarted = new TemporaryDirectoryReservations(reservations.root)
+    const restarted = new TemporaryWorkspaceReservations(reservations.root)
     const fresh = await restarted.reserve()
 
     await expect(stat(abandoned.path)).rejects.toMatchObject({ code: 'ENOENT' })
@@ -140,10 +140,10 @@ describe('TemporaryDirectoryReservations', () => {
   })
 
   it('raises a too-small retention to the safe floor', async () => {
-    const parent = await mkdtemp(join(tmpdir(), 'dsh-temporary-session-test-'))
+    const parent = await mkdtemp(join(tmpdir(), 'dsh-temporary-workspace-test-'))
     roots.push(parent)
     // A zero or tiny grace would delete reservations mid-adoption.
-    const reservations = new TemporaryDirectoryReservations(join(parent, 'scratch'), 0)
+    const reservations = new TemporaryWorkspaceReservations(join(parent, 'scratch'), 0)
     expect(reservations.retentionMs).toBe(MIN_RESERVATION_RETENTION_MS)
   })
 
@@ -157,7 +157,7 @@ describe('TemporaryDirectoryReservations', () => {
     // compromised Client might try; all are unauthorized to address.
     for (const attempt of [
       reserved.path,
-      `${reservations.root}/task-does-not-exist`,
+      `${reservations.root}/workspace-does-not-exist`,
       '/etc/passwd',
       '/',
       '../../etc/passwd',
@@ -195,10 +195,10 @@ describe('TemporaryDirectoryReservations', () => {
     await reservations.reserve()
     // A symlink named like a reservation, pointing outside the root. The sweep
     // must not traverse it and must not delete the outside target.
-    const outsideDir = await mkdtemp(join(tmpdir(), 'dsh-temporary-session-outside-'))
+    const outsideDir = await mkdtemp(join(tmpdir(), 'dsh-temporary-workspace-outside-'))
     roots.push(outsideDir)
     await writeFile(join(outsideDir, 'keep-me.txt'), 'precious')
-    await symlink(outsideDir, join(reservations.root, 'task-symlink'))
+    await symlink(outsideDir, join(reservations.root, 'workspace-symlink'))
 
     const farFuture = Date.now() + reservations.retentionMs * 100
     expect(await reservations.sweepAbandoned(farFuture)).toEqual({ reclaimed: 0 })
@@ -217,15 +217,15 @@ describe('configuration', () => {
   it('derives the reservation root from the single root field', () => {
     // One configured directory owns all persistent state, so there is one thing
     // to configure, back up, or relocate.
-    expect(resolveReservationRoot({ root: '/tmp/scratch-root' })).toBe('/tmp/scratch-root')
+    expect(resolveTemporaryWorkspaceRoot({ root: '/tmp/scratch-root' })).toBe('/tmp/scratch-root')
     // Relative input is resolved to an absolute path, never left ambiguous.
-    expect(isAbsolute(resolveReservationRoot({ root: 'relative/scratch' }))).toBe(true)
+    expect(isAbsolute(resolveTemporaryWorkspaceRoot({ root: 'relative/scratch' }))).toBe(true)
   })
 
   it('falls back to the DSH home directory when root is omitted', () => {
-    const derived = resolveReservationRoot({})
+    const derived = resolveTemporaryWorkspaceRoot({})
     expect(isAbsolute(derived)).toBe(true)
-    expect(derived.endsWith('temporary-sessions')).toBe(true)
+    expect(derived.endsWith('temporary-workspaces')).toBe(true)
   })
 
   it('applies the retention floor to hostile or absent values', () => {
@@ -237,14 +237,14 @@ describe('configuration', () => {
   })
 
   it('normalizes page-entered roots and preserves the original default', () => {
-    expect(normalizeTemporarySessionRoot('  /tmp/scratch  ')).toBe('/tmp/scratch')
-    expect(normalizeTemporarySessionRoot('~/scratch')).toContain('/scratch')
-    expect(DEFAULT_TEMPORARY_SESSION_ROOT.endsWith('temporary-sessions')).toBe(true)
+    expect(normalizeTemporaryWorkspaceRoot('  /tmp/scratch  ')).toBe('/tmp/scratch')
+    expect(normalizeTemporaryWorkspaceRoot('~/scratch')).toContain('/scratch')
+    expect(DEFAULT_TEMPORARY_WORKSPACE_ROOT.endsWith('temporary-workspaces')).toBe(true)
   })
 
   it('rejects ambiguous or dangerously broad page-entered roots', () => {
-    expect(() => normalizeTemporarySessionRoot('')).toThrow('cannot be empty')
-    expect(() => normalizeTemporarySessionRoot('relative/scratch')).toThrow('absolute path')
-    expect(() => normalizeTemporarySessionRoot('/')).toThrow('filesystem root')
+    expect(() => normalizeTemporaryWorkspaceRoot('')).toThrow('cannot be empty')
+    expect(() => normalizeTemporaryWorkspaceRoot('relative/scratch')).toThrow('absolute path')
+    expect(() => normalizeTemporaryWorkspaceRoot('/')).toThrow('filesystem root')
   })
 })

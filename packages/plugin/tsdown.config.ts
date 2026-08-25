@@ -1,6 +1,6 @@
 import { defineConfig } from 'tsdown'
 
-const PACKAGE = 'dsh-temporary-session'
+const PACKAGE = 'dsh-temporary-workspace'
 const CLIENT_EXTERNALS = [
   '@deepseek-ai/cordis',
   '@deepseek-ai/dsh-client-runtime/client',

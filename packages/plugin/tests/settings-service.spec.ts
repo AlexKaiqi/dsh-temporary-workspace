@@ -2,18 +2,19 @@ import { Context } from '@deepseek-ai/cordis'
 import { mkdtemp, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
-import { TemporarySessionService } from '../lib/index.js'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { TemporaryWorkspaceService } from '../lib/index.js'
 
 const roots: string[] = []
 
 afterEach(async () => {
+  vi.restoreAllMocks()
   await Promise.all(roots.splice(0).map(path => rm(path, { recursive: true, force: true })))
 })
 
-describe('TemporarySessionService settings', () => {
+describe('TemporaryWorkspaceService settings', () => {
   it('persists a picked root and uses it for the next reservation', async () => {
-    const parent = await mkdtemp(join(tmpdir(), 'dsh-temporary-session-settings-'))
+    const parent = await mkdtemp(join(tmpdir(), 'dsh-temporary-workspace-settings-'))
     roots.push(parent)
     const defaultRoot = join(parent, 'default')
     const chosenRoot = join(parent, 'chosen')
@@ -28,7 +29,7 @@ describe('TemporarySessionService settings', () => {
     const settings = {
       writable: true,
       register: () => scope,
-      describe: () => [{ ns: 'temporary-session', revision }],
+      describe: () => [{ ns: 'temporary-workspace', revision }],
       replace: async (_namespace: string, section: { root: string }, expectedRevision: number) => {
         expect(expectedRevision).toBe(revision)
         value = section
@@ -41,21 +42,20 @@ describe('TemporarySessionService settings', () => {
         pick: async () => chosenRoot,
       }),
     }
-    const attached: string[] = []
-    const workspace = {
-      id: 'temporary-workspace',
-      path: chosenRoot,
-      attachSession: async (sessionId: string) => { attached.push(sessionId) },
-    }
-    const workspaceRegistry = {
-      create: async (path: string) => ({ ...workspace, path }),
-      insertBefore: async () => [],
-    }
     const ctx = new Context()
     ctx.provide('settings', settings as never)
     ctx.provide('directoryPicker', directoryPicker as never)
-    ctx.provide('workspaceRegistry', workspaceRegistry as never)
-    const service = new TemporarySessionService(ctx, { root: defaultRoot })
+    const attached: string[] = []
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    ctx.provide('workspaceRegistry', {
+      create: async (path: string) => ({
+        id: `workspace:${path}`,
+        path,
+        attachSession: async (sessionId: string) => { attached.push(sessionId) },
+      }),
+      insertBefore: async () => { throw new Error('ordering unavailable') },
+    } as never)
+    const service = new TemporaryWorkspaceService(ctx, { root: defaultRoot })
 
     await expect(service.describeSettings()).resolves.toMatchObject({ root: defaultRoot, defaultRoot })
     await expect(service.pickRoot()).resolves.toEqual({ supported: true, path: chosenRoot })
@@ -65,15 +65,11 @@ describe('TemporarySessionService settings', () => {
     })
     await expect(stat(chosenRoot)).resolves.toBeDefined()
 
-    await expect(service.prepareWorkspace()).resolves.toEqual({ path: chosenRoot, workspaceId: 'temporary-workspace' })
-    await expect(service.attachSession({ sessionId: 'session-1' })).resolves.toEqual({
-      attached: true,
-      workspaceId: 'temporary-workspace',
-    })
-    expect(attached).toEqual(['session-1'])
-
     const reservation = await service.reserve()
-    expect(reservation.path.startsWith(`${chosenRoot}/task-`)).toBe(true)
-    await expect(service.keep({ reservationId: reservation.reservationId })).resolves.toEqual({ found: true })
+    expect(reservation.path.startsWith(`${chosenRoot}/workspace-`)).toBe(true)
+    await expect(service.adopt({ reservationId: reservation.reservationId, sessionId: 'session-1' }))
+      .resolves.toEqual({ found: true, workspaceId: `workspace:${reservation.path}` })
+    expect(attached).toEqual(['session-1'])
+    expect(warning).toHaveBeenCalledOnce()
   })
 })

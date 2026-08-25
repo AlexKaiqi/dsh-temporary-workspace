@@ -4,17 +4,17 @@ import type { ClientContext, SnapshotStore } from '@deepseek-ai/dsh-client-runti
 import type { InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
 import type {
-  TemporarySessionRootPickResult,
-  TemporarySessionSettingsSaveRequest,
-  TemporarySessionSettingsView,
+  TemporaryWorkspaceRootPickResult,
+  TemporaryWorkspaceSettingsSaveRequest,
+  TemporaryWorkspaceSettingsView,
 } from '../types.ts'
 import type { RemoteResult } from './workflow.ts'
-import type { TemporarySessionTranslate } from './locales.ts'
+import type { TemporaryWorkspaceTranslate } from './locales.ts'
 
-export interface TemporarySessionSettingsPort {
-  describeSettings: () => Promise<RemoteResult<TemporarySessionSettingsView>>
-  saveSettings: (request: TemporarySessionSettingsSaveRequest) => Promise<RemoteResult<TemporarySessionSettingsView>>
-  pickRoot: () => Promise<RemoteResult<TemporarySessionRootPickResult>>
+export interface TemporaryWorkspaceSettingsPort {
+  describeSettings: () => Promise<RemoteResult<TemporaryWorkspaceSettingsView>>
+  saveSettings: (request: TemporaryWorkspaceSettingsSaveRequest) => Promise<RemoteResult<TemporaryWorkspaceSettingsView>>
+  pickRoot: () => Promise<RemoteResult<TemporaryWorkspaceRootPickResult>>
 }
 
 interface SettingsCardState {
@@ -31,8 +31,8 @@ interface SettingsCardState {
 }
 
 interface SettingsCardFace {
-  hooks: { temporarySessionSettings: SnapshotStore<SettingsCardState> }
-  t: TemporarySessionTranslate
+  hooks: { temporaryWorkspaceSettings: SnapshotStore<SettingsCardState> }
+  t: TemporaryWorkspaceTranslate
   edit: (root: string) => void
   save: () => void
   reload: () => void
@@ -79,20 +79,20 @@ function createSettingsStore<T>(initial: T): SnapshotStore<T> {
   }
 }
 
-export class TemporarySessionSettingsController {
+export class TemporaryWorkspaceSettingsController {
   private state = INITIAL_STATE
   private readonly store = createSettingsStore(this.state)
 
   constructor(
-    private readonly remote: TemporarySessionSettingsPort,
-    private readonly t: TemporarySessionTranslate,
+    private readonly remote: TemporaryWorkspaceSettingsPort,
+    private readonly t: TemporaryWorkspaceTranslate,
   ) {
     void this.reload()
   }
 
   inject(): SettingsCardFace {
     return {
-      hooks: { temporarySessionSettings: this.store },
+      hooks: { temporaryWorkspaceSettings: this.store },
       t: this.t,
       edit: root => this.publish({ draftRoot: root, error: undefined }),
       save: () => { void this.save() },
@@ -107,7 +107,7 @@ export class TemporarySessionSettingsController {
     this.store.set(this.state)
   }
 
-  private accept(view: TemporarySessionSettingsView): void {
+  private accept(view: TemporaryWorkspaceSettingsView): void {
     this.publish({
       status: 'ready',
       revision: view.revision,
@@ -156,66 +156,66 @@ export class TemporarySessionSettingsController {
   }
 }
 
-function TemporarySessionSettingsCard(props: SettingsCardProps) {
-  const state = props.useTemporarySessionSettings(snapshot => snapshot)
-  if (state.status === 'loading') return <li className="temporary-session-settings"><p>{props.t('loading')}</p></li>
+function TemporaryWorkspaceSettingsCard(props: SettingsCardProps) {
+  const state = props.useTemporaryWorkspaceSettings(snapshot => snapshot)
+  if (state.status === 'loading') return <li className="temporary-workspace-settings"><p>{props.t('loading')}</p></li>
   if (state.status === 'error') {
-    return <li className="temporary-session-settings"><p className="temporary-session-error">{state.error}</p><button onClick={props.reload}>{props.t('retry')}</button></li>
+    return <li className="temporary-workspace-settings"><p className="temporary-workspace-error">{state.error}</p><button onClick={props.reload}>{props.t('retry')}</button></li>
   }
   const dirty = state.draftRoot !== state.persistedRoot
   const disabled = !state.writable || state.saving
   return (
-    <li className="temporary-session-settings">
-      <div className="temporary-session-heading">
+    <li className="temporary-workspace-settings">
+      <div className="temporary-workspace-heading">
         <div><h3>{props.t('title')}</h3><p>{props.t('description')}</p></div>
       </div>
-      <label className="temporary-session-field">
+      <label className="temporary-workspace-field">
         <span>{props.t('root')}</span>
-        <div className="temporary-session-path-row">
+        <div className="temporary-workspace-path-row">
           <input type="text" value={state.draftRoot} disabled={disabled} onChange={event => props.edit(event.target.value)} placeholder={state.defaultRoot} />
           {state.pickerSupported && <button type="button" disabled={disabled || state.picking} onClick={props.pick}>{state.picking ? props.t('picking') : props.t('choose')}</button>}
         </div>
         <small>{props.t('rootHint')} <code>{state.defaultRoot}</code></small>
       </label>
-      {state.error !== undefined && <p className="temporary-session-error">{state.error}</p>}
-      <div className="temporary-session-actions">
+      {state.error !== undefined && <p className="temporary-workspace-error">{state.error}</p>}
+      <div className="temporary-workspace-actions">
         <button type="button" disabled={disabled || state.draftRoot === state.defaultRoot} onClick={props.useDefault}>{props.t('default')}</button>
         <button type="button" disabled={!dirty || state.saving} onClick={props.reload}>{props.t('discard')}</button>
-        <button type="button" className="temporary-session-primary" disabled={!dirty || disabled} onClick={props.save}>{state.saving ? props.t('saving') : props.t('save')}</button>
+        <button type="button" className="temporary-workspace-primary" disabled={!dirty || disabled} onClick={props.save}>{state.saving ? props.t('saving') : props.t('save')}</button>
       </div>
     </li>
   )
 }
 
 const CSS = `
-.temporary-session-settings{list-style:none;border:1px solid var(--border-color,#d9d9d9);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:16px;background:var(--card-background,transparent)}
-.temporary-session-heading h3{margin:0 0 4px;font-size:16px}.temporary-session-heading p{margin:0;color:var(--text-secondary,#666);font-size:13px}
-.temporary-session-field{display:flex;flex-direction:column;gap:6px;font-size:13px}.temporary-session-field>span{font-weight:600}.temporary-session-field small{color:var(--text-secondary,#666);line-height:1.45}.temporary-session-field code{overflow-wrap:anywhere}
-.temporary-session-path-row{display:flex;gap:8px}.temporary-session-path-row input{min-width:0;flex:1;font:inherit;color:inherit;background:var(--input-background,transparent);border:1px solid var(--border-color,#ccc);border-radius:8px;padding:8px 10px}
-.temporary-session-path-row button,.temporary-session-actions button,.temporary-session-settings>button{border-radius:8px;padding:8px 14px;border:1px solid var(--border-color,#ccc);background:transparent;color:inherit;font:inherit;cursor:pointer;white-space:nowrap}.temporary-session-actions{display:flex;justify-content:flex-end;gap:8px}.temporary-session-primary{background:var(--accent-color,#1677ff)!important;color:#fff!important;border-color:transparent!important}.temporary-session-settings button:disabled{opacity:.5;cursor:default}.temporary-session-error{color:#c62828;margin:0;font-size:13px}@media(max-width:700px){.temporary-session-path-row{align-items:stretch;flex-direction:column}.temporary-session-actions{flex-wrap:wrap}}
+.temporary-workspace-settings{list-style:none;border:1px solid var(--border-color,#d9d9d9);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:16px;background:var(--card-background,transparent)}
+.temporary-workspace-heading h3{margin:0 0 4px;font-size:16px}.temporary-workspace-heading p{margin:0;color:var(--text-secondary,#666);font-size:13px}
+.temporary-workspace-field{display:flex;flex-direction:column;gap:6px;font-size:13px}.temporary-workspace-field>span{font-weight:600}.temporary-workspace-field small{color:var(--text-secondary,#666);line-height:1.45}.temporary-workspace-field code{overflow-wrap:anywhere}
+.temporary-workspace-path-row{display:flex;gap:8px}.temporary-workspace-path-row input{min-width:0;flex:1;font:inherit;color:inherit;background:var(--input-background,transparent);border:1px solid var(--border-color,#ccc);border-radius:8px;padding:8px 10px}
+.temporary-workspace-path-row button,.temporary-workspace-actions button,.temporary-workspace-settings>button{border-radius:8px;padding:8px 14px;border:1px solid var(--border-color,#ccc);background:transparent;color:inherit;font:inherit;cursor:pointer;white-space:nowrap}.temporary-workspace-actions{display:flex;justify-content:flex-end;gap:8px}.temporary-workspace-primary{background:var(--accent-color,#1677ff)!important;color:#fff!important;border-color:transparent!important}.temporary-workspace-settings button:disabled{opacity:.5;cursor:default}.temporary-workspace-error{color:#c62828;margin:0;font-size:13px}@media(max-width:700px){.temporary-workspace-path-row{align-items:stretch;flex-direction:column}.temporary-workspace-actions{flex-wrap:wrap}}
 `
 
 /** Register the card under Settings → Plugins. */
-export function registerTemporarySessionSettingsCard(
+export function registerTemporaryWorkspaceSettingsCard(
   ctx: ClientContext,
-  remote: TemporarySessionSettingsPort,
-  t: TemporarySessionTranslate,
+  remote: TemporaryWorkspaceSettingsPort,
+  t: TemporaryWorkspaceTranslate,
 ): void {
   if (typeof document !== 'undefined') {
     ctx.effect(() => {
       const style = document.createElement('style')
-      style.dataset.plugin = 'temporary-session'
+      style.dataset.plugin = 'temporary-workspace'
       style.textContent = CSS
       document.head.append(style)
       return () => style.remove()
-    }, 'temporary-session: settings styles')
+    }, 'temporary-workspace: settings styles')
   }
-  const controller = new TemporarySessionSettingsController(remote, t)
+  const controller = new TemporaryWorkspaceSettingsController(remote, t)
   ctx.slots.inject('settings.plugin.item', () => ctx.slots.register({
     name: 'settings.plugin.item',
-    key: 'temporary-session',
+    key: 'temporary-workspace',
     priority: 35,
-    locale: 'temporarySession',
+    locale: 'temporaryWorkspace',
     inject: () => controller.inject(),
-  }, TemporarySessionSettingsCard))
+  }, TemporaryWorkspaceSettingsCard))
 }

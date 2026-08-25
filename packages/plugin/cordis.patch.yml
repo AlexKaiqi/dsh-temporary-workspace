@@ -1,13 +1,9 @@
-# The scratch root is durable on purpose and is registered as one fixed
-# Workspace. Every click creates a new Session in that Workspace, so temporary
-# work stays under one sidebar group and historical cwd values remain valid.
-#
-# reservationRetentionMs now applies only to compatibility cleanup for
-# per-Session reservations created by older plugin clients. Adopted legacy
-# directories are unmarked and never reclaimed.
+# The configured root is a durable parent. Every click allocates one unique
+# child directory and registers it as an independent Workspace. Adopted
+# directories remain so historical Sessions keep a valid cwd.
 - insert:
-    - id: temporary-session
-      name: dsh-temporary-session
+    - id: temporary-workspace
+      name: dsh-temporary-workspace
       config:
-        root: !!js dshHomePath('temporary-sessions')
+        root: !!js dshHomePath('temporary-workspaces')
         reservationRetentionMs: 3600000

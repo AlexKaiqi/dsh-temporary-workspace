@@ -6,7 +6,7 @@ export default defineConfig({
     // Client composition tests exercise the source tree before Typert build
     // artifacts exist. Production builds still consume the generated module.
     alias: {
-      'dsh-temporary-session/remote': fileURLToPath(
+      'dsh-temporary-workspace/remote': fileURLToPath(
         new URL('./packages/plugin/tests/remote-fixture.ts', import.meta.url),
       ),
     },
