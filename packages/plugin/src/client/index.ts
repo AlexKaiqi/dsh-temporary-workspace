@@ -46,7 +46,6 @@ export async function apply(ctx: ClientContext): Promise<() => Promise<void>> {
         remote,
         workspaces: remoteCtx.workspaces,
         sessions: remoteCtx.sessions,
-        title: t('title'),
       }).then(() => undefined).catch((error: unknown) => {
         console.error('[temporary-workspace] creation failed:', error)
       }).finally(() => { pending = undefined })

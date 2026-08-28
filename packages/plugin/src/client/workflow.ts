@@ -1,4 +1,4 @@
-/** Transactional client workflow for creating and opening one isolated temporary Workspace. */
+/** Transactional client workflow for opening one isolated temporary Session. */
 
 /** Structural result used by generated Typert Remote methods. */
 export type RemoteResult<T> =
@@ -21,8 +21,6 @@ export interface TemporaryWorkspaceRegistryPort<WorkspaceId, SessionId> {
     title: string
   }>
   connectWorkspace: (workspaceId: WorkspaceId) => Promise<SessionId>
-  rename: (workspaceId: WorkspaceId, title: string) => Promise<unknown>
-  insertBefore: (workspaceId: WorkspaceId, beforeWorkspaceId?: WorkspaceId) => Promise<void>
   delete: (workspaceId: WorkspaceId) => Promise<void>
 }
 
@@ -31,7 +29,7 @@ export interface TemporaryWorkspaceNavigationPort<SessionId> {
   open: (sessionId: SessionId) => void
 }
 
-/** Diagnostic sink for best-effort presentation and cleanup failures. */
+/** Diagnostic sink for best-effort accounting and cleanup failures. */
 export interface TemporaryWorkspaceDiagnostics {
   warn: (message: string, error: unknown) => void
 }
@@ -41,6 +39,8 @@ export interface TemporaryWorkspaceStartResult<WorkspaceId, SessionId> {
   readonly path: string
   readonly workspaceId: WorkspaceId
   readonly sessionId: SessionId
+  /** Whether the temporary registration was removed so the Session is Ungrouped. */
+  readonly workspaceDetached: boolean
 }
 
 /** Turn a generated Remote failure into one workflow error. */
@@ -84,23 +84,17 @@ async function adopt(
   await retire(remote, 'retain', reservationId, diagnostics)
 }
 
-/** Give each generated Workspace a recognizable, collision-safe display title. */
-function generatedWorkspaceTitle(path: string, title: string): string {
-  const basename = path.replace(/[\\/]+$/, '').split(/[\\/]/).at(-1) ?? path
-  return `${title} · ${basename}`
-}
-
 /**
- * Allocate a unique child below the configured root, register that child as a
- * Workspace, create its first Session, and retain both for history/resume.
- * Every invocation starts from a fresh reservation, so blank-session reuse can
- * never cross temporary Workspace boundaries.
+ * Allocate a unique child below the configured root, use a short-lived
+ * Workspace registration to create its first Session, then remove only that
+ * registration. The directory and Session remain durable, and the Session is
+ * shown under the sidebar's fixed-last Ungrouped section instead of creating a
+ * competing Workspace group.
  */
 export async function startTemporaryWorkspace<WorkspaceId, SessionId>(ports: {
   readonly remote: TemporaryWorkspaceRemotePort
   readonly workspaces: TemporaryWorkspaceRegistryPort<WorkspaceId, SessionId>
   readonly sessions: TemporaryWorkspaceNavigationPort<SessionId>
-  readonly title: string
   readonly diagnostics?: TemporaryWorkspaceDiagnostics
 }): Promise<TemporaryWorkspaceStartResult<WorkspaceId, SessionId>> {
   const diagnostics = ports.diagnostics ?? console
@@ -114,22 +108,6 @@ export async function startTemporaryWorkspace<WorkspaceId, SessionId>(ports: {
   } catch (error) {
     await retire(ports.remote, 'discard', reservation.reservationId, diagnostics)
     throw error
-  }
-
-  // Naming and ordering are presentation-only. Either may fail without
-  // sacrificing an otherwise valid isolated Workspace.
-  try {
-    await ports.workspaces.rename(
-      workspace.workspaceId,
-      generatedWorkspaceTitle(workspace.path, ports.title),
-    )
-  } catch (error) {
-    diagnostics.warn('temporary Workspace rename failed', error)
-  }
-  try {
-    await ports.workspaces.insertBefore(workspace.workspaceId)
-  } catch (error) {
-    diagnostics.warn('temporary Workspace ordering failed', error)
   }
 
   let sessionId: SessionId
@@ -148,9 +126,24 @@ export async function startTemporaryWorkspace<WorkspaceId, SessionId>(ports: {
 
   await adopt(ports.remote, reservation.reservationId, String(sessionId), diagnostics)
   ports.sessions.open(sessionId)
-  return {
-    path: workspace.path,
-    workspaceId: workspace.workspaceId,
-    sessionId,
+
+  // The Workspace is only a creation bridge. Removing its registration leaves
+  // the Session and files intact while placing the Session in Ungrouped.
+  try {
+    await ports.workspaces.delete(workspace.workspaceId)
+    return {
+      path: workspace.path,
+      workspaceId: workspace.workspaceId,
+      sessionId,
+      workspaceDetached: true,
+    }
+  } catch (error) {
+    diagnostics.warn('temporary Workspace opened but its registration remains', error)
+    return {
+      path: workspace.path,
+      workspaceId: workspace.workspaceId,
+      sessionId,
+      workspaceDetached: false,
+    }
   }
 }

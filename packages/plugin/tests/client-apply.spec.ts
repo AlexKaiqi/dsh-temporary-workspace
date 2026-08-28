@@ -56,8 +56,6 @@ describe('temporary Workspace client composition', () => {
         path,
         title: path.split('/').at(-1),
       })),
-      rename: vi.fn(async () => undefined),
-      insertBefore: vi.fn(async () => undefined),
       connectWorkspace: vi.fn(() => {
         connectCount += 1
         return connectCount === 1 ? firstConnect : Promise.resolve(`session-${connectCount}`)
@@ -111,7 +109,7 @@ describe('temporary Workspace client composition', () => {
 
     expect(workspaces.create).toHaveBeenNthCalledWith(1, { path: '/scratch/workspace-1' })
     expect(workspaces.create).toHaveBeenNthCalledWith(2, { path: '/scratch/workspace-2' })
-    expect(workspaces.delete).not.toHaveBeenCalled()
+    expect(workspaces.delete).toHaveBeenCalledTimes(2)
 
     await fiber.dispose()
     expect(disposeRemote).toHaveBeenCalledOnce()

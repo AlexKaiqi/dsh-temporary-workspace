@@ -51,9 +51,9 @@
     }
   },
   "lifecycle": {
-    "currentFlow": "Every creation action reserves a new child, registers that child as its own Workspace, creates and opens one Session in it, then adopts the reservation.",
-    "isolation": "Each invocation receives a distinct canonical cwd. Blank-session reuse remains confined to the newly created Workspace and cannot cross task boundaries.",
-    "durability": "Adopted Workspace directories are retained because deleting them would invalidate historical Session cwd values.",
+    "currentFlow": "Every creation action reserves a new child, briefly registers it as a Workspace to create one Session, adopts the reservation, then removes only the registration so the Session appears in Ungrouped.",
+    "isolation": "Each invocation receives a distinct canonical cwd. The transitional Workspace registration is removed after Session creation, so blank-session reuse cannot cross temporary tasks and no persistent Workspace group is added.",
+    "durability": "Adopted directories and Session logs are retained. Removing the transitional Workspace registration does not delete either and leaves the Session in Ungrouped.",
     "crashWindow": "A Host crash between reserve and adopt/retain/discard leaves a pending marker. A later sweep reclaims only markers older than reservationRetentionMs.",
     "rollback": "Registration failure discards the child. Session creation failure deregisters the Workspace and discards the child; if deregistration fails, retain preserves the directory beneath the live registration."
   },

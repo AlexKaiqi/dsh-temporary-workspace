@@ -9,12 +9,12 @@ A configurable **Temporary Workspace** for DeepSeek Harness. Every creation rece
 Each click on the Temporary Workspace sidebar action runs one rollback-safe transaction:
 
 1. The Host uses `mkdtemp` to create a unique `workspace-*` child below the configured parent.
-2. The Client registers that child as an ordinary Workspace and moves it to the end of the Workspace list.
-3. The plugin creates and opens the Workspace's first Session. Its `cwd` is the unique child.
+2. The Client briefly registers that child as a Workspace and uses it to create and open the first Session. Its `cwd` is that unique child.
+3. After the Session exists, the temporary Workspace registration is removed. The Session and files remain and appear in the fixed-last Ungrouped section instead of creating a competing Workspace group.
 4. Success clears the pending-adoption marker; registration or Session creation failure rolls back the Workspace and child.
 5. Every click starts from a new child, so blank Session reuse cannot cross temporary-task boundaries.
 
-Generated Workspaces remain registered and are titled “Temporary Workspace · workspace-…”. Users can rename them normally. “Temporary” means not tied to an existing project; it does not mean immediate deletion on close. Adopted directories must remain so historical Session `cwd` values stay valid.
+“Temporary” means not tied to an existing project; it does not mean immediate deletion on close. Adopted directories must remain so historical Session `cwd` values stay valid.
 
 The Host reclaims only unadopted, crash-orphaned reservations older than the grace period. Adopted directories carry no pending marker and are never removed by this sweep.
 
@@ -40,7 +40,7 @@ The Settings namespace is `temporary-workspace`. `reservationRetentionMs` is the
 Plugins that create background Sessions should inject `temporaryWorkspaces` and use the same ownership transaction:
 
 1. Call `reserve()` and use the returned `path` as the new Session's `cwd`.
-2. After Session creation, call `adopt({ reservationId, sessionId })` to register the directory as its Workspace and attach the Session.
+2. After Session creation, call `adopt({ reservationId, sessionId })` to validate and account for directory use; the user-facing creation flow then removes its transitional Workspace registration so the Session becomes Ungrouped.
 3. If creation fails before a Session exists, call `discard({ reservationId })`. If a Session exists but adoption cannot complete, call `retain({ reservationId })` so crash recovery cannot delete its live `cwd`.
 
 Reservation IDs are opaque capabilities. Cleanup methods never accept caller-supplied paths.

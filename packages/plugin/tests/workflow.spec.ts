@@ -31,10 +31,6 @@ function bench() {
       calls.push(`create-${path}`)
       return { workspaceId: `id-${path}`, path, title: path.split('/').at(-1) ?? path }
     }),
-    rename: vi.fn(async (workspaceId: string, title: string) => {
-      calls.push(`rename-${workspaceId}-${title}`)
-    }),
-    insertBefore: vi.fn(async (workspaceId: string) => { calls.push(`append-${workspaceId}`) }),
     connectWorkspace: vi.fn(async (workspaceId: string) => {
       calls.push(`connect-${workspaceId}`)
       return `session-${workspaceId}`
@@ -43,38 +39,35 @@ function bench() {
   }
   const sessions = { open: vi.fn((sessionId: string) => { calls.push(`open-${sessionId}`) }) }
   const diagnostics = { warn: vi.fn() }
-  return { calls, remote, workspaces, sessions, diagnostics, title: 'Temporary Workspace' }
+  return { calls, remote, workspaces, sessions, diagnostics }
 }
 
 describe('startTemporaryWorkspace', () => {
-  it('creates and retains a distinct child Workspace for every invocation', async () => {
+  it('creates a distinct child and leaves each Session Ungrouped', async () => {
     const b = bench()
 
     await expect(startTemporaryWorkspace(b)).resolves.toEqual({
       path: '/scratch/workspace-1',
       workspaceId: 'id-/scratch/workspace-1',
       sessionId: 'session-id-/scratch/workspace-1',
+      workspaceDetached: true,
     })
     await expect(startTemporaryWorkspace(b)).resolves.toEqual({
       path: '/scratch/workspace-2',
       workspaceId: 'id-/scratch/workspace-2',
       sessionId: 'session-id-/scratch/workspace-2',
+      workspaceDetached: true,
     })
 
     expect(b.workspaces.create).toHaveBeenNthCalledWith(1, { path: '/scratch/workspace-1' })
     expect(b.workspaces.create).toHaveBeenNthCalledWith(2, { path: '/scratch/workspace-2' })
-    expect(b.workspaces.rename).toHaveBeenNthCalledWith(
-      1,
-      'id-/scratch/workspace-1',
-      'Temporary Workspace · workspace-1',
-    )
-    expect(b.workspaces.insertBefore).toHaveBeenNthCalledWith(1, 'id-/scratch/workspace-1')
+    expect(b.workspaces.delete).toHaveBeenNthCalledWith(1, 'id-/scratch/workspace-1')
+    expect(b.workspaces.delete).toHaveBeenNthCalledWith(2, 'id-/scratch/workspace-2')
     expect(b.remote.adopt).toHaveBeenNthCalledWith(1, {
       reservationId: 'reservation-1',
       sessionId: 'session-id-/scratch/workspace-1',
     })
     expect(b.sessions.open).toHaveBeenCalledTimes(2)
-    expect(b.workspaces.delete).not.toHaveBeenCalled()
   })
 
   it('discards the child when Workspace registration fails', async () => {
@@ -109,17 +102,17 @@ describe('startTemporaryWorkspace', () => {
     )
   })
 
-  it('does not block creation when presentation updates fail', async () => {
+  it('keeps the opened Session when temporary Workspace deregistration fails', async () => {
     const b = bench()
-    b.workspaces.rename.mockRejectedValueOnce(new Error('rename failed'))
+    b.workspaces.delete.mockRejectedValueOnce(new Error('delete failed'))
 
     await expect(startTemporaryWorkspace(b)).resolves.toMatchObject({
       path: '/scratch/workspace-1',
+      workspaceDetached: false,
     })
-    expect(b.workspaces.connectWorkspace).toHaveBeenCalledOnce()
-    expect(b.workspaces.insertBefore).toHaveBeenCalledOnce()
+    expect(b.sessions.open).toHaveBeenCalledOnce()
     expect(b.diagnostics.warn).toHaveBeenCalledWith(
-      'temporary Workspace rename failed',
+      'temporary Workspace opened but its registration remains',
       expect.any(Error),
     )
   })
