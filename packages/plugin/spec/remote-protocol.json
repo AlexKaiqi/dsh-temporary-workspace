@@ -1,19 +1,24 @@
 {
-  "version": "2.0.0",
+  "version": "3.0.0",
   "name": "temporary-workspace-remote",
-  "summary": "Typert Remote protocol between the Client and Host halves of the temporary Workspace plugin.",
-  "rationale": "The browser requests opaque reservations; the Host retains sole custody of directory creation and deletion so no cleanup method accepts a caller-supplied path.",
+  "summary": "Typert Remote protocol for isolated temporary Session directories and one Client-only sidebar group.",
+  "rationale": "Each creation keeps its own workspace-* child cwd. The Client groups those Sessions by the canonical configured parent without changing Host Workspace membership or Session headers.",
   "transport": {
     "kind": "typert-remote",
     "service": "temporaryWorkspaces",
     "resultShape": "RemoteResult<T> = { ok: true, value: T } | { ok: false, error: { code, message } }"
   },
   "capabilitySecurity": {
-    "model": "opaque reservation id",
-    "description": "reserve() mints a UUID that is the only handle accepted by adopt(), retain(), and discard(). The settings API accepts a parent path only for validated future allocation; no cleanup method accepts a caller-supplied filesystem path.",
-    "verifiedBy": "packages/plugin/tests/reservations.spec.ts verifies containment, opaque-id deletion, symlink resistance, and crash recovery."
+    "model": "canonical group root plus opaque reservation id",
+    "description": "prepareGroup() exposes only the canonical configured parent used for Client classification. reserve() mints the only handle accepted by adopt(), retain(), and discard(); no cleanup method accepts a caller-supplied path.",
+    "verifiedBy": "settings-service.spec.ts verifies canonical group preparation; reservations.spec.ts verifies containment, opaque-id deletion, symlink resistance, and crash recovery."
   },
   "methods": {
+    "prepareGroup": {
+      "params": {},
+      "returns": "{ root: string }",
+      "effect": "Creates the configured parent when necessary and returns its fs.realpath canonical path for exact immediate-child matching in the Client."
+    },
     "reserve": {
       "params": {},
       "returns": "{ reservationId: string, path: string }",
@@ -22,12 +27,12 @@
     "adopt": {
       "params": "{ reservationId: string, sessionId: string }",
       "returns": "{ found: boolean, workspaceId?: string }",
-      "effect": "Registers the reserved path as a Workspace, validates and attaches the created Session, moves the Workspace to the end, and clears its pending marker."
+      "effect": "Registers the reserved child as a transient Workspace, validates and attaches the created Session, and clears its pending marker."
     },
     "retain": {
       "params": "{ reservationId: string }",
       "returns": "{ found: boolean }",
-      "effect": "Clears the pending marker without attaching a Session. Used only when rollback cannot remove a Workspace registration and deleting its directory would be unsafe."
+      "effect": "Clears the pending marker without deleting the child when rollback cannot prove deletion is safe."
     },
     "discard": {
       "params": "{ reservationId: string }",
@@ -42,7 +47,7 @@
     "saveSettings": {
       "params": "{ expectedRevision: number, root: string }",
       "returns": "{ revision, writable, pickerSupported, defaultRoot, root }",
-      "effect": "Normalizes an absolute non-filesystem-root path, creates and permission-checks it, persists it through DSH Settings, and uses it for future reservations."
+      "effect": "Normalizes an absolute non-filesystem-root path, creates and permission-checks it, persists it through DSH Settings, and uses it for future reservations and group matching."
     },
     "pickRoot": {
       "params": {},
@@ -51,11 +56,10 @@
     }
   },
   "lifecycle": {
-    "currentFlow": "Every creation action reserves a new child, briefly registers it as a Workspace to create one Session, adopts the reservation, then removes only the registration so the Session appears in Ungrouped.",
-    "isolation": "Each invocation receives a distinct canonical cwd. The transitional Workspace registration is removed after Session creation, so blank-session reuse cannot cross temporary tasks and no persistent Workspace group is added.",
-    "durability": "Adopted directories and Session logs are retained. Removing the transitional Workspace registration does not delete either and leaves the Session in Ungrouped.",
-    "crashWindow": "A Host crash between reserve and adopt/retain/discard leaves a pending marker. A later sweep reclaims only markers older than reservationRetentionMs.",
-    "rollback": "Registration failure discards the child. Session creation failure deregisters the Workspace and discards the child; if deregistration fails, retain preserves the directory beneath the live registration."
+    "currentFlow": "Every group plus action reserves a new child, creates a transient Host Workspace, calls sessions.create({ workspaceId }) for a guaranteed-fresh Session, adopts the reservation, and best-effort removes only the Workspace registration.",
+    "presentation": "ui-workspace claims Sessions whose canonical cwd is one immediate workspace-* child of the current canonical root, suppresses matching transient Workspace rows, and renders one contributed fold.",
+    "durability": "Adopted directories and Session logs are retained. Removing a transient Workspace registration deletes neither; immutable Session cwd is never rewritten.",
+    "crashWindow": "A Host crash between reserve and adopt/retain/discard leaves a pending marker. A later sweep reclaims only markers older than reservationRetentionMs."
   },
   "configuration": {
     "root": "Configurable parent directory; defaults to $DSH_HOME/temporary-workspaces. The Settings namespace is temporary-workspace.",

@@ -1,4 +1,9 @@
-/** A Host-owned directory not yet adopted by a temporary Workspace. */
+/** Canonical parent used by the Client-only temporary Session group. */
+export interface TemporaryWorkspaceGroup {
+  readonly root: string
+}
+
+/** A Host-owned directory not yet adopted by a temporary Session. */
 export interface TemporaryWorkspaceReservation {
   /** Opaque capability used only to adopt, retain, or discard this reservation. */
   readonly reservationId: string

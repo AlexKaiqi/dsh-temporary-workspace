@@ -1,6 +1,5 @@
-# The configured root is a durable parent. Every click allocates one unique
-# child directory and registers it as an independent Workspace. Adopted
-# directories remain so historical Sessions keep a valid cwd.
+# The configured root owns isolated workspace-* children. The Client folds
+# their Sessions into one contributed sidebar group without changing Host membership.
 - insert:
     - id: temporary-workspace
       name: dsh-temporary-workspace

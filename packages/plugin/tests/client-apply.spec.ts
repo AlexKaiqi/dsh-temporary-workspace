@@ -3,13 +3,12 @@ import { describe, expect, it, vi } from 'vitest'
 import { apply, inject } from '../src/client/index.ts'
 
 describe('temporary Workspace client composition', () => {
-  it('registers the action and coalesces repeated creation clicks', async () => {
+  it('registers one contributed group, creates fresh Sessions, and no footer action', async () => {
     const ctx = new Context()
-    let finishConnect!: (sessionId: string) => void
-    const firstConnect = new Promise<string>(resolve => { finishConnect = resolve })
     let reservation = 0
     const disposeRemote = vi.fn(async () => {})
     const temporaryWorkspaces = {
+      prepareGroup: vi.fn(async () => ({ ok: true as const, value: { root: '/scratch' } })),
       reserve: vi.fn(async () => {
         reservation += 1
         return {
@@ -20,7 +19,7 @@ describe('temporary Workspace client composition', () => {
           },
         }
       }),
-      adopt: vi.fn(async () => ({ ok: true as const, value: { found: true, workspaceId: 'workspace' } })),
+      adopt: vi.fn(async () => ({ ok: true as const, value: { found: true } })),
       retain: vi.fn(async () => ({ ok: true as const, value: { found: true } })),
       discard: vi.fn(async () => ({ ok: true as const, value: { found: true } })),
       describeSettings: vi.fn(async () => ({
@@ -49,69 +48,63 @@ describe('temporary Workspace client composition', () => {
         }
       })
     }
-    let connectCount = 0
     const workspaces = {
       create: vi.fn(async ({ path }: { path: string }) => ({
         workspaceId: `workspace-${path}`,
         path,
-        title: path.split('/').at(-1),
       })),
-      connectWorkspace: vi.fn(() => {
-        connectCount += 1
-        return connectCount === 1 ? firstConnect : Promise.resolve(`session-${connectCount}`)
-      }),
       delete: vi.fn(async () => undefined),
     }
-    const sessions = { open: vi.fn() }
+    let session = 0
+    const sessions = {
+      create: vi.fn(async () => {
+        session += 1
+        return `session-${session}`
+      }),
+    }
     const slots = {
       register: vi.fn(() => undefined),
       inject: vi.fn((_name: string, register: () => unknown) => register()),
     }
     const locale = {
       register: vi.fn(() => () => {}),
-      bind: vi.fn(() => (key: string) => key),
+      bind: vi.fn(() => (key: string) => key === 'title' ? 'Temporary Workspace' : key),
     }
+    const unregisterGroup = vi.fn()
+    const uiWorkspace = { registerSessionGroup: vi.fn(() => unregisterGroup) }
     const remote = new TestRemoteService(ctx, 'remote')
     ctx.provide('workspaces', workspaces as never)
     ctx.provide('sessions', sessions as never)
+    ctx.provide('uiWorkspace', uiWorkspace as never)
     ctx.provide('slots', slots as never)
     ctx.provide('locale', locale as never)
 
     const fiber = ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
-    expect(locale.register).toHaveBeenCalledWith('temporaryWorkspace', expect.any(Object))
-    expect(slots.inject).toHaveBeenCalledWith('settings.plugin.item', expect.any(Function))
-    expect(slots.inject).toHaveBeenCalledWith('sidebar.footer.action', expect.any(Function))
-    expect(slots.register).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'sidebar.footer.action', id: 'temporary-workspace' }),
-      expect.any(Function),
-    )
-
-    const action = slots.register.mock.calls
-      .map(([descriptor]) => descriptor)
-      .find(descriptor => descriptor.name === 'sidebar.footer.action')
-    const start = action.inject().start as () => Promise<void>
-    const first = start()
-    const coalesced = start()
-    expect(first).toBe(coalesced)
-    expect(temporaryWorkspaces.reserve).toHaveBeenCalledOnce()
-
-    finishConnect('session-1')
-    await first
-    await vi.waitFor(() => { expect(sessions.open).toHaveBeenCalledWith('session-1') })
-
-    await Promise.resolve()
-    await start()
     await vi.waitFor(() => {
-      expect(temporaryWorkspaces.reserve).toHaveBeenCalledTimes(2)
-      expect(sessions.open).toHaveBeenCalledWith('session-2')
+      expect(temporaryWorkspaces.prepareGroup).toHaveBeenCalledOnce()
+      expect(uiWorkspace.registerSessionGroup).toHaveBeenCalledOnce()
     })
+    expect(slots.inject).toHaveBeenCalledWith('settings.plugin.item', expect.any(Function))
+    expect(slots.inject).not.toHaveBeenCalledWith('sidebar.footer.action', expect.any(Function))
+    expect(slots.register.mock.calls.some(([descriptor]) => (
+      descriptor as { name?: string }
+    ).name === 'sidebar.footer.action')).toBe(false)
 
-    expect(workspaces.create).toHaveBeenNthCalledWith(1, { path: '/scratch/workspace-1' })
-    expect(workspaces.create).toHaveBeenNthCalledWith(2, { path: '/scratch/workspace-2' })
+    const group = uiWorkspace.registerSessionGroup.mock.calls[0]![0]
+    expect(group).toMatchObject({
+      id: 'temporary-workspace',
+      label: 'Temporary Workspace',
+      cwd: { parent: '/scratch', immediateChildPrefix: 'workspace-' },
+    })
+    await expect(group.createSession()).resolves.toBe('session-1')
+    await expect(group.createSession()).resolves.toBe('session-2')
+    expect(temporaryWorkspaces.reserve).toHaveBeenCalledTimes(2)
+    expect(sessions.create).toHaveBeenCalledTimes(2)
     expect(workspaces.delete).toHaveBeenCalledTimes(2)
 
     await fiber.dispose()
+    expect(unregisterGroup).toHaveBeenCalledOnce()
     expect(disposeRemote).toHaveBeenCalledOnce()
   })
 })

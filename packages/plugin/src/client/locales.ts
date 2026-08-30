@@ -4,11 +4,11 @@ export const NS = 'temporaryWorkspace'
 
 export const en = {
   title: 'Temporary Workspace',
-  description: 'Choose the parent directory used to create one isolated Workspace per temporary task.',
+  description: 'Choose the parent directory for isolated temporary Sessions shown in one sidebar group.',
   loading: 'Loading settings…',
   retry: 'Retry',
   root: 'Temporary Workspace parent directory',
-  rootHint: 'Each new temporary Workspace receives a unique child directory here. Default:',
+  rootHint: 'Each temporary Session gets a unique workspace-* child here. Default:',
   choose: 'Choose directory',
   picking: 'Choosing…',
   default: 'Use default',
@@ -23,13 +23,13 @@ type Dict = Record<TemporaryWorkspaceLocaleKey, string>
 export const dictionaries = {
   en,
   zh: {
-    title: '临时工作区', description: '选择父目录；每个临时任务都会在其中创建独立工作区。', loading: '正在读取设置…', retry: '重试',
-    root: '临时工作区父目录', rootHint: '每个新临时工作区都会在这里获得唯一子目录。默认位于 DSH Home：', choose: '选择目录', picking: '选择中…',
+    title: '临时工作区', description: '选择临时会话的父目录；独立子目录中的会话统一折叠在一个侧栏分组中。', loading: '正在读取设置…', retry: '重试',
+    root: '临时工作区父目录', rootHint: '每个临时会话都会在这里获得唯一的 workspace-* 子目录。默认位于 DSH Home：', choose: '选择目录', picking: '选择中…',
     default: '使用默认地址', discard: '放弃更改', save: '保存', saving: '保存中…',
   },
   'zh-TW': {
-    title: '臨時工作區', description: '選擇父目錄；每個臨時任務都會在其中建立獨立工作區。', loading: '正在讀取設定…', retry: '重試',
-    root: '臨時 Workspace 父目錄', rootHint: '每個新臨時 Workspace 都會在此取得唯一子目錄。預設：', choose: '選擇目錄', picking: '選擇中…',
+    title: '臨時工作區', description: '選擇臨時 Session 的父目錄；獨立子目錄中的 Session 統一折疊在一個側欄群組中。', loading: '正在讀取設定…', retry: '重試',
+    root: '臨時 Workspace 父目錄', rootHint: '每個臨時 Session 都會在此取得唯一的 workspace-* 子目錄。預設：', choose: '選擇目錄', picking: '選擇中…',
     default: '使用預設位置', discard: '捨棄變更', save: '儲存', saving: '儲存中…',
   },
   ja: {

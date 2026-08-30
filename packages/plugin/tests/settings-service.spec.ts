@@ -1,19 +1,18 @@
 import { Context } from '@deepseek-ai/cordis'
-import { mkdtemp, rm, stat } from 'node:fs/promises'
+import { mkdtemp, realpath, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { TemporaryWorkspaceService } from '../lib/index.js'
 
 const roots: string[] = []
 
 afterEach(async () => {
-  vi.restoreAllMocks()
   await Promise.all(roots.splice(0).map(path => rm(path, { recursive: true, force: true })))
 })
 
 describe('TemporaryWorkspaceService settings', () => {
-  it('persists a picked root and uses it for the next reservation', async () => {
+  it('persists a picked root, exposes its canon, and uses it for the next reservation', async () => {
     const parent = await mkdtemp(join(tmpdir(), 'dsh-temporary-workspace-settings-'))
     roots.push(parent)
     const defaultRoot = join(parent, 'default')
@@ -42,18 +41,17 @@ describe('TemporaryWorkspaceService settings', () => {
         pick: async () => chosenRoot,
       }),
     }
+    const attached: string[] = []
     const ctx = new Context()
     ctx.provide('settings', settings as never)
     ctx.provide('directoryPicker', directoryPicker as never)
-    const attached: string[] = []
-    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     ctx.provide('workspaceRegistry', {
       create: async (path: string) => ({
         id: `workspace:${path}`,
         path,
         attachSession: async (sessionId: string) => { attached.push(sessionId) },
       }),
-      insertBefore: async () => { throw new Error('ordering unavailable') },
+      insertBefore: async () => [],
     } as never)
     const service = new TemporaryWorkspaceService(ctx, { root: defaultRoot })
 
@@ -64,12 +62,12 @@ describe('TemporaryWorkspaceService settings', () => {
       root: chosenRoot,
     })
     await expect(stat(chosenRoot)).resolves.toBeDefined()
+    await expect(service.prepareGroup()).resolves.toEqual({ root: await realpath(chosenRoot) })
 
     const reservation = await service.reserve()
     expect(reservation.path.startsWith(`${chosenRoot}/workspace-`)).toBe(true)
     await expect(service.adopt({ reservationId: reservation.reservationId, sessionId: 'session-1' }))
       .resolves.toEqual({ found: true, workspaceId: `workspace:${reservation.path}` })
     expect(attached).toEqual(['session-1'])
-    expect(warning).toHaveBeenCalledOnce()
   })
 })

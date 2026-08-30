@@ -1,9 +1,9 @@
-/** Host half of the one-click temporary Workspace plugin. */
+/** Host half of the isolated temporary Workspace plugin. */
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-host-directory-picker'
-import { access, constants, mkdir } from 'node:fs/promises'
+import { access, constants, mkdir, realpath } from 'node:fs/promises'
 import type { SettingsScope } from '@deepseek-ai/dsh-settings'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { TemporaryWorkspaceReservations, DEFAULT_RESERVATION_RETENTION_MS, MIN_RESERVATION_RETENTION_MS } from './reservations.ts'
@@ -21,6 +21,7 @@ import type {
   TemporaryWorkspaceReservationRef,
   TemporaryWorkspaceReservationResult,
   TemporaryWorkspaceRootPickResult,
+  TemporaryWorkspaceGroup,
   TemporaryWorkspaceSettingsSaveRequest,
   TemporaryWorkspaceSettingsView,
 } from './types.ts'
@@ -38,12 +39,12 @@ interface TemporaryWorkspaceRegistry {
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
-    /** Isolated temporary-Workspace reservation service for the local Client. */
+    /** Isolated temporary Workspace reservation and settings service. */
     temporaryWorkspaces: TemporaryWorkspaceService
   }
 }
 
-/** Host service that allocates isolated Workspaces below one configurable root. */
+/** Host service that owns isolated scratch directories and their lifecycle. */
 export class TemporaryWorkspaceService extends TypertRemoteService {
   static inject = ['settings', 'directoryPicker', 'workspaceRegistry']
 
@@ -68,8 +69,15 @@ export class TemporaryWorkspaceService extends TypertRemoteService {
     this.manager(this.scope.get().root)
   }
 
+  /** Return the canonical parent used by the Client-only sidebar group. */
+  @Remote('prepareGroup')
+  async prepareGroup(): Promise<TemporaryWorkspaceGroup> {
+    const prepared = await this.manager(this.scope.get().root).prepareRoot()
+    return { root: await realpath(prepared.path) }
+  }
+
   /**
-   * Reserve one isolated child directory for a not-yet-created Workspace.
+   * Reserve one isolated child directory for a new temporary Session.
    * @returns the opaque reservation id and its new absolute path.
    */
   @Remote('reserve')
@@ -141,7 +149,7 @@ export class TemporaryWorkspaceService extends TypertRemoteService {
     return this.settingsView()
   }
 
-  /** Validate, persist, and activate a new parent for future Workspaces. */
+  /** Validate, persist, and activate a new temporary-Workspace parent. */
   @Remote('saveSettings')
   async saveSettings(request: TemporaryWorkspaceSettingsSaveRequest): Promise<TemporaryWorkspaceSettingsView> {
     const root = normalizeTemporaryWorkspaceRoot(request.root)
@@ -199,6 +207,7 @@ export type {
   TemporaryWorkspaceReservationResult,
   TemporaryWorkspaceSweepResult,
   TemporaryWorkspaceRootPickResult,
+  TemporaryWorkspaceGroup,
   TemporaryWorkspaceSettingsSaveRequest,
   TemporaryWorkspaceSettingsView,
 } from './types.ts'

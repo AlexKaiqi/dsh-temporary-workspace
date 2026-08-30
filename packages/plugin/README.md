@@ -2,25 +2,21 @@
 
 English | [中文](README.zh.md)
 
-A configurable **Temporary Workspace** for DeepSeek Harness. Every creation receives its own directory, keeping scratch work isolated from projects and from other temporary tasks.
+A configurable **Temporary Workspace** for DeepSeek Harness. Each temporary Session keeps an isolated scratch directory while the sidebar folds every matching Session into one contributed group.
 
 ## Behavior
 
-Each click on the Temporary Workspace sidebar action runs one rollback-safe transaction:
+1. The Host reserves a unique `workspace-*` child below the configured `root` for every creation.
+2. The Client creates a transient Host Workspace for that child and calls `sessions.create({ workspaceId })`, which guarantees a fresh Session instead of reusing an existing blank.
+3. After adoption, the transient Workspace registration is removed without deleting the Session log, its directory, or files.
+4. The Workspace browser groups Sessions whose canonical `cwd` is one immediate `workspace-*` child of the canonical root. Matching transient Workspace rows are presentation-suppressed, so retained old registrations do not create duplicate sidebar groups.
+5. The group row's `+` is the only dedicated creation action. The plugin does not register a sidebar footer button.
 
-1. The Host uses `mkdtemp` to create a unique `workspace-*` child below the configured parent.
-2. The Client briefly registers that child as a Workspace and uses it to create and open the first Session. Its `cwd` is that unique child.
-3. After the Session exists, the temporary Workspace registration is removed. The Session and files remain and appear in the fixed-last Ungrouped section instead of creating a competing Workspace group.
-4. Success clears the pending-adoption marker; registration or Session creation failure rolls back the Workspace and child.
-5. Every click starts from a new child, so blank Session reuse cannot cross temporary-task boundaries.
-
-“Temporary” means not tied to an existing project; it does not mean immediate deletion on close. Adopted directories must remain so historical Session `cwd` values stay valid.
-
-The Host reclaims only unadopted, crash-orphaned reservations older than the grace period. Adopted directories carry no pending marker and are never removed by this sweep.
+“Temporary” means not tied to an existing project; it does not mean delete-on-close. Adopted directories and Session logs remain available across restarts.
 
 ## Configuration
 
-`root` is the **parent** for generated Workspaces, not one Workspace shared by Sessions:
+`root` is the parent for isolated temporary Session directories:
 
 ```yaml
 - insert:
@@ -31,40 +27,26 @@ The Host reclaims only unadopted, crash-orphaned reservations older than the gra
         reservationRetentionMs: 3600000
 ```
 
-The default is `$DSH_HOME/temporary-workspaces`, normally `~/.dsh/temporary-workspaces`. It can also be edited live under **Settings → Plugins → Temporary Workspace**. Changes affect future creations only; existing Workspaces, Sessions, and files are not migrated or deleted.
+The default is `$DSH_HOME/temporary-workspaces`, normally `~/.dsh/temporary-workspaces`. It can be edited live under **Settings → Plugins → Temporary Workspace**. A new root affects future creation and the contributed group matcher; existing Sessions, Workspaces, and files are not migrated or deleted.
 
-The Settings namespace is `temporary-workspace`. `reservationRetentionMs` is the unadopted-directory grace period: one hour by default, with a one-minute minimum.
+The Settings namespace is `temporary-workspace`. `reservationRetentionMs` is the grace for an unadopted crash-window reservation: one hour by default, with a one-minute minimum.
 
 ## Plugin integration
 
-Plugins that create background Sessions should inject `temporaryWorkspaces` and use the same ownership transaction:
-
-1. Call `reserve()` and use the returned `path` as the new Session's `cwd`.
-2. After Session creation, call `adopt({ reservationId, sessionId })` to validate and account for directory use; the user-facing creation flow then removes its transitional Workspace registration so the Session becomes Ungrouped.
-3. If creation fails before a Session exists, call `discard({ reservationId })`. If a Session exists but adoption cannot complete, call `retain({ reservationId })` so crash recovery cannot delete its live `cwd`.
-
-Reservation IDs are opaque capabilities. Cleanup methods never accept caller-supplied paths.
+Background products use the same `reserve` / create / `adopt` transaction. Cleanup accepts only the opaque reservation id; callers cannot submit an arbitrary deletion path. `prepareGroup()` returns the canonical configured root for the Client projection.
 
 ## Installation
 
-Target DeepSeek Harness version: `0.1.1-rc.2`.
+This release requires a DSH build that provides the `uiWorkspace.registerSessionGroup()` Client API.
 
 ```sh
 pnpm install --frozen-lockfile --ignore-scripts
 pnpm check
 pnpm pack:plugin
-dsh plugin --profile web add "$PWD/artifacts/dsh-temporary-workspace-0.1.0-rc.5.tgz"
+dsh plugin --profile web add "$PWD/artifacts/dsh-temporary-workspace-0.1.0-rc.6.tgz"
 ```
 
-After npm publication:
-
-```sh
-dsh plugin --profile web add 'dsh-temporary-workspace@0.1.0-rc.5'
-```
-
-Prerelease versions are published under the npm `next` tag.
-
-Restart the DSH Web process after installation or upgrade.
+Prerelease versions are published under the npm `next` tag. Restart the DSH Web process after installation or upgrade.
 
 ## Development
 

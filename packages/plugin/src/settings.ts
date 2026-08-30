@@ -17,7 +17,7 @@ export interface TemporaryWorkspaceSettings {
 
 export const TEMPORARY_WORKSPACE_SETTINGS_NAMESPACE = settingsNamespace('temporary-workspace')
 
-/** Default parent under DSH Home (`~/.dsh` unless DSH_HOME is overridden). */
+/** Default parent under DSH Home (`~/.dsh` unless overridden). */
 export const DEFAULT_TEMPORARY_WORKSPACE_ROOT = dshHomePath('temporary-workspaces')
 
 /** Persistent settings schema shared by the Host runtime and Web settings card. */

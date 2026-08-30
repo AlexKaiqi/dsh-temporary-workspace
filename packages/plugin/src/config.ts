@@ -9,7 +9,7 @@ import {
 
 /** Host configuration for scratch-directory placement. */
 export interface Config {
-  /** Parent for generated Workspaces. Defaults to `$DSH_HOME/temporary-workspaces`. */
+  /** Parent for isolated scratch Workspaces. Defaults to `$DSH_HOME/temporary-workspaces`. */
   readonly root?: string
   /**
    * Grace before an unadopted reservation is treated as abandoned and reclaimed.
@@ -20,12 +20,10 @@ export interface Config {
 }
 
 /**
- * Resolve the single runtime root every reservation path derives from.
+ * Resolve the parent for isolated temporary Workspace directories.
  *
- * All persistent state this plugin owns lives under exactly one directory, so
- * there is one thing to configure, back up, or relocate. Reservation directories
- * are created inside it by `mkdtemp` and are never addressed by a
- * caller-supplied path.
+ * Every reservation creates one direct `workspace-*` child below it. Cleanup
+ * addresses those children only through opaque reservation ids.
  *
  * Kept out of the service module so configuration can be resolved and tested
  * without loading the decorated Remote class.

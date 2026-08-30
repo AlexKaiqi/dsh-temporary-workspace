@@ -29,21 +29,23 @@ function bench() {
   const workspaces = {
     create: vi.fn(async ({ path }: { path: string }) => {
       calls.push(`create-${path}`)
-      return { workspaceId: `id-${path}`, path, title: path.split('/').at(-1) ?? path }
-    }),
-    connectWorkspace: vi.fn(async (workspaceId: string) => {
-      calls.push(`connect-${workspaceId}`)
-      return `session-${workspaceId}`
+      return { workspaceId: `id-${path}`, path }
     }),
     delete: vi.fn(async (workspaceId: string) => { calls.push(`delete-${workspaceId}`) }),
   }
-  const sessions = { open: vi.fn((sessionId: string) => { calls.push(`open-${sessionId}`) }) }
+  const sessions = {
+    create: vi.fn(async ({ workspaceId }: { workspaceId: string }) => {
+      const id = `session-${workspaceId}`
+      calls.push(`session-create-${workspaceId}`)
+      return id
+    }),
+  }
   const diagnostics = { warn: vi.fn() }
   return { calls, remote, workspaces, sessions, diagnostics }
 }
 
 describe('startTemporaryWorkspace', () => {
-  it('creates a distinct child and leaves each Session Ungrouped', async () => {
+  it('creates a distinct child and guaranteed-fresh Session on every call', async () => {
     const b = bench()
 
     await expect(startTemporaryWorkspace(b)).resolves.toEqual({
@@ -59,15 +61,10 @@ describe('startTemporaryWorkspace', () => {
       workspaceDetached: true,
     })
 
-    expect(b.workspaces.create).toHaveBeenNthCalledWith(1, { path: '/scratch/workspace-1' })
-    expect(b.workspaces.create).toHaveBeenNthCalledWith(2, { path: '/scratch/workspace-2' })
-    expect(b.workspaces.delete).toHaveBeenNthCalledWith(1, 'id-/scratch/workspace-1')
-    expect(b.workspaces.delete).toHaveBeenNthCalledWith(2, 'id-/scratch/workspace-2')
-    expect(b.remote.adopt).toHaveBeenNthCalledWith(1, {
-      reservationId: 'reservation-1',
-      sessionId: 'session-id-/scratch/workspace-1',
-    })
-    expect(b.sessions.open).toHaveBeenCalledTimes(2)
+    expect(b.sessions.create).toHaveBeenNthCalledWith(1, { workspaceId: 'id-/scratch/workspace-1' })
+    expect(b.sessions.create).toHaveBeenNthCalledWith(2, { workspaceId: 'id-/scratch/workspace-2' })
+    expect(b.workspaces.delete).toHaveBeenCalledTimes(2)
+    expect(b.remote.reserve).toHaveBeenCalledTimes(2)
   })
 
   it('discards the child when Workspace registration fails', async () => {
@@ -76,22 +73,21 @@ describe('startTemporaryWorkspace', () => {
 
     await expect(startTemporaryWorkspace(b)).rejects.toThrow('registration failed')
     expect(b.remote.discard).toHaveBeenCalledWith({ reservationId: 'reservation-1' })
-    expect(b.workspaces.connectWorkspace).not.toHaveBeenCalled()
+    expect(b.sessions.create).not.toHaveBeenCalled()
   })
 
   it('rolls back the Workspace and child when Session creation fails', async () => {
     const b = bench()
-    b.workspaces.connectWorkspace.mockRejectedValueOnce(new Error('session failed'))
+    b.sessions.create.mockRejectedValueOnce(new Error('session failed'))
 
     await expect(startTemporaryWorkspace(b)).rejects.toThrow('session failed')
     expect(b.workspaces.delete).toHaveBeenCalledWith('id-/scratch/workspace-1')
     expect(b.remote.discard).toHaveBeenCalledWith({ reservationId: 'reservation-1' })
-    expect(b.sessions.open).not.toHaveBeenCalled()
   })
 
-  it('preserves a registered directory when rollback cannot remove its Workspace', async () => {
+  it('retains the child when rollback cannot remove its Workspace', async () => {
     const b = bench()
-    b.workspaces.connectWorkspace.mockRejectedValueOnce(new Error('session failed'))
+    b.sessions.create.mockRejectedValueOnce(new Error('session failed'))
     b.workspaces.delete.mockRejectedValueOnce(new Error('delete failed'))
 
     await expect(startTemporaryWorkspace(b)).rejects.toThrow('session failed')
@@ -102,15 +98,11 @@ describe('startTemporaryWorkspace', () => {
     )
   })
 
-  it('keeps the opened Session when temporary Workspace deregistration fails', async () => {
+  it('keeps the Session when transient Workspace deletion fails', async () => {
     const b = bench()
     b.workspaces.delete.mockRejectedValueOnce(new Error('delete failed'))
 
-    await expect(startTemporaryWorkspace(b)).resolves.toMatchObject({
-      path: '/scratch/workspace-1',
-      workspaceDetached: false,
-    })
-    expect(b.sessions.open).toHaveBeenCalledOnce()
+    await expect(startTemporaryWorkspace(b)).resolves.toMatchObject({ workspaceDetached: false })
     expect(b.diagnostics.warn).toHaveBeenCalledWith(
       'temporary Workspace opened but its registration remains',
       expect.any(Error),
@@ -125,10 +117,9 @@ describe('startTemporaryWorkspace', () => {
     })
 
     await expect(startTemporaryWorkspace(b)).resolves.toMatchObject({
-      path: '/scratch/workspace-1',
+      path: '/scratch/workspace-1', workspaceDetached: true,
     })
     expect(b.remote.retain).toHaveBeenCalledWith({ reservationId: 'reservation-1' })
-    expect(b.sessions.open).toHaveBeenCalledOnce()
   })
 
   it('surfaces a typed Host reservation failure without touching Workspaces', async () => {

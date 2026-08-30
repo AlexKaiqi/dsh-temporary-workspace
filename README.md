@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-A DeepSeek Harness **Temporary Workspace** plugin. It creates a unique child directory and Workspace below a configurable parent for every temporary task, preventing scratch Sessions from sharing files.
+A DeepSeek Harness **Temporary Workspace** plugin. It keeps one isolated scratch directory per temporary Session while folding all of them into one configurable sidebar group.
 
 The installable package lives in [packages/plugin](packages/plugin). Its README documents behavior, retention, configuration, and installation.
 

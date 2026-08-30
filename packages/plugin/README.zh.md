@@ -2,25 +2,21 @@
 
 [English](README.md) | 中文
 
-DeepSeek Harness 的可配置**临时工作区**。适合临时分析、一次性任务和插件后台工作：每次创建都会获得独立目录，不会与项目目录或其他临时任务共享文件。
+DeepSeek Harness 的可配置**临时工作区**。每个临时 Session 保留独立 scratch 目录，侧栏则把所有匹配 Session 折叠到一个贡献分组中。
 
 ## 行为
 
-每次点击侧栏的“临时工作区”后，插件执行一笔带回滚的创建流程：
+1. 每次创建时，Host 都会在配置的 `root` 下预留唯一 `workspace-*` 子目录。
+2. Client 为该子目录创建短暂的 Host Workspace，并调用 `sessions.create({ workspaceId })`；这保证创建全新 Session，不复用已有空白 Session。
+3. 采用完成后只移除短暂 Workspace 注册，不删除 Session 日志、目录或文件。
+4. Workspace 浏览器把规范 `cwd` 为规范 root 直接 `workspace-*` 子目录的 Session 收入一个“临时工作区”分组。匹配的短暂 Workspace 行仅在展示层隐藏，因此旧注册残留也不会产生重复分组。
+5. 分组行上的 `+` 是唯一专用创建入口。插件不再注册侧栏底部按钮。
 
-1. Host 在配置的父目录下用 `mkdtemp` 创建唯一的 `workspace-*` 子目录。
-2. Client 临时注册该子目录为 Workspace，并用它创建、打开首个 Session。这个 Session 的 `cwd` 就是该唯一子目录。
-3. Session 建立后立即移除临时 Workspace 注册；Session 和文件均保留，并显示在工作区列表末尾固定的“未分组”区域，不新增抢占注意力的 Workspace 分组。
-4. 创建成功后清除待采用标记；注册或 Session 创建失败时回滚 Workspace 和子目录。
-5. 每次点击都会从新的子目录开始，所以空白 Session 复用不会跨临时任务发生。
-
-“临时”表示不绑定已有项目，并不表示关闭后立即删除。已采用目录必须保留，否则历史 Session 的 `cwd` 会失效。
-
-Host 会清理创建过程中因进程崩溃遗留、且超过宽限期的未采用目录；已被 Workspace 采用的目录没有待处理标记，不会被这项清理误删。
+“临时”表示不绑定既有项目，不表示关闭时删除。已采用目录和 Session 日志会跨重启保留。
 
 ## 配置
 
-`root` 是生成临时 Workspace 的**父目录**，不是多个会话共用的 Workspace：
+`root` 是独立临时 Session 目录的父目录：
 
 ```yaml
 - insert:
@@ -31,40 +27,26 @@ Host 会清理创建过程中因进程崩溃遗留、且超过宽限期的未采
         reservationRetentionMs: 3600000
 ```
 
-默认值是 `$DSH_HOME/temporary-workspaces`，通常为 `~/.dsh/temporary-workspaces`。也可在 **设置 → 插件 → 临时工作区** 中实时修改；保存后只影响后续创建，既有 Workspace、Session 和文件不会迁移或删除。
+默认值是 `$DSH_HOME/temporary-workspaces`，通常为 `~/.dsh/temporary-workspaces`。也可在 **设置 → 插件 → 临时工作区** 中实时修改。新 root 只影响后续创建与贡献分组匹配；既有 Session、Workspace 和文件不会迁移或删除。
 
-Settings namespace 为 `temporary-workspace`。`reservationRetentionMs` 是未采用目录的回收宽限期，默认一小时，最小一分钟。
+Settings namespace 为 `temporary-workspace`。`reservationRetentionMs` 是崩溃窗口内未采用 reservation 的保留期，默认一小时，最小一分钟。
 
 ## 插件对接
 
-需要创建后台 Session 的插件应注入 `temporaryWorkspaces`，并遵循同一套所有权事务：
-
-1. 调用 `reserve()`，把返回的 `path` 作为新 Session 的 `cwd`。
-2. Session 创建后调用 `adopt({ reservationId, sessionId })`，验证并登记目录使用；面向用户的创建流程随后移除过渡 Workspace 注册，使 Session 进入“未分组”。
-3. 如果 Session 创建前失败，调用 `discard({ reservationId })`；如果 Session 已存在但采用流程未能完成，调用 `retain({ reservationId })`，避免崩溃回收误删仍在使用的 `cwd`。
-
-Reservation ID 是不透明能力标识；清理接口不接受调用方提供的路径。
+后台产品使用同一套 `reserve` / create / `adopt` 事务。清理只接受不透明 reservation id，调用者不能提交任意删除路径。`prepareGroup()` 返回 Client 投影使用的规范配置 root。
 
 ## 安装
 
-目标版本为 DeepSeek Harness `0.1.1-rc.2`：
+此版本要求 DSH 提供 `uiWorkspace.registerSessionGroup()` Client API。
 
 ```sh
 pnpm install --frozen-lockfile --ignore-scripts
 pnpm check
 pnpm pack:plugin
-dsh plugin --profile web add "$PWD/artifacts/dsh-temporary-workspace-0.1.0-rc.5.tgz"
+dsh plugin --profile web add "$PWD/artifacts/dsh-temporary-workspace-0.1.0-rc.6.tgz"
 ```
 
-发布 npm 后可安装：
-
-```sh
-dsh plugin --profile web add 'dsh-temporary-workspace@0.1.0-rc.5'
-```
-
-预发布版本使用 npm `next` tag。
-
-安装或升级后重启 DSH Web process。
+预发布版本使用 npm `next` tag。安装或升级后重启 DSH Web process。
 
 ## 开发
 

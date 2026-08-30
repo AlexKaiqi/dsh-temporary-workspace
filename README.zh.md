@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-这是一个 DeepSeek Harness **临时工作区**插件。它在可配置的父目录下，为每个临时任务自动创建独立子目录和 Workspace，避免不同临时会话共享文件。
+这是一个 DeepSeek Harness **临时工作区**插件。每个临时 Session 保留独立 scratch 目录，但侧栏会把它们统一折叠在一个可配置分组中。
 
 可安装包位于 [packages/plugin](packages/plugin)。详细行为、保留语义、配置和安装方式见包内 README。
 

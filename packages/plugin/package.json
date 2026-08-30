@@ -1,7 +1,7 @@
 {
   "name": "dsh-temporary-workspace",
-  "description": "Creates an isolated temporary Workspace for every scratch task in DeepSeek Harness",
-  "version": "0.1.0-rc.5",
+  "description": "Folds isolated temporary Sessions into one configurable sidebar group in DeepSeek Harness",
+  "version": "0.1.0-rc.6",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/",
@@ -62,7 +62,7 @@
     "temporary-workspace",
     "workspace",
     "session",
-    "isolation"
+    "grouping"
   ],
   "license": "MIT",
   "repository": {
@@ -76,8 +76,8 @@
   "dsh": {
     "inventory": {
       "summary": {
-        "zh": "按配置的父目录为每个临时任务创建独立工作区。",
-        "en": "Creates one isolated Workspace per temporary task below a configurable parent."
+        "zh": "把独立目录中的临时 Session 收纳到一个可配置、可折叠的侧栏分组中。",
+        "en": "Folds isolated temporary Sessions into one configurable sidebar group."
       },
       "tags": [
         "session",
@@ -89,7 +89,7 @@
         "@deepseek-ai/dsh-api-remotes",
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-runtime",
-        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-workspace",
         "@deepseek-ai/dsh-client-ui-settings",
         "@deepseek-ai/dsh-client-ui-settings-plugins",
         "@deepseek-ai/dsh-host-directory-picker",
@@ -105,7 +105,7 @@
         "@deepseek-ai/dsh-api-remotes",
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-runtime",
-        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-workspace",
         "@deepseek-ai/dsh-client-ui-settings",
         "@deepseek-ai/dsh-client-ui-settings-plugins"
       ],
@@ -125,7 +125,7 @@
     "@deepseek-ai/dsh-api-remotes": "catalog:",
     "@deepseek-ai/dsh-client-locale": "catalog:",
     "@deepseek-ai/dsh-client-runtime": "catalog:",
-    "@deepseek-ai/dsh-client-ui-sidebar": "catalog:",
+    "@deepseek-ai/dsh-client-ui-workspace": "catalog:",
     "@deepseek-ai/dsh-client-ui-settings": "catalog:",
     "@deepseek-ai/dsh-client-ui-settings-plugins": "catalog:",
     "@deepseek-ai/dsh-client-ui-slots": "catalog:",

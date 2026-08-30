@@ -38,7 +38,7 @@ export class TemporaryWorkspaceReservations {
   readonly retentionMs: number
 
   /**
-   * @param root - parent directory for every isolated temporary task.
+   * @param root - parent directory for every isolated temporary Session.
    * @param retentionMs - grace before an unadopted reservation is swept;
    *   clamped to at least {@link MIN_RESERVATION_RETENTION_MS}.
    */
@@ -47,7 +47,7 @@ export class TemporaryWorkspaceReservations {
     this.retentionMs = Math.max(MIN_RESERVATION_RETENTION_MS, retentionMs)
   }
 
-  /** Ensure the durable parent for generated temporary Workspaces exists. */
+  /** Ensure the durable parent exists and sweep abandoned reservations. */
   async prepareRoot(): Promise<{ readonly path: string }> {
     await mkdir(this.root, { recursive: true, mode: 0o700 })
     await this.sweepAbandoned().catch(() => undefined)
