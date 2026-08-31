@@ -10,7 +10,7 @@ const CLIENT_EXTERNALS = [
 
 const host = {
   name: PACKAGE,
-  entry: ['lib/types/index.js', 'lib/types/invariant.js'],
+  entry: ['lib/types/index.js'],
   outDir: 'lib',
   format: ['esm'] as const,
   platform: 'node' as const,

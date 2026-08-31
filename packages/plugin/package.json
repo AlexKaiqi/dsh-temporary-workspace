@@ -15,10 +15,6 @@
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
-    "./invariant": {
-      "types": "./lib/types/invariant.d.ts",
-      "default": "./lib/invariant.js"
-    },
     "./client": {
       "types": "./lib/types/client/index.d.ts",
       "default": "./lib/client.js"
@@ -40,7 +36,6 @@
   },
   "files": [
     "lib/index.js",
-    "lib/invariant.js",
     "lib/client.js",
     "lib/client.js.map",
     "lib/types/**/*.js",
@@ -131,7 +126,6 @@
     "@deepseek-ai/dsh-client-ui-slots": "catalog:",
     "@deepseek-ai/dsh-home-paths": "catalog:",
     "@deepseek-ai/dsh-host-directory-picker": "catalog:",
-    "@deepseek-ai/dsh-invariants": "catalog:",
     "@deepseek-ai/dsh-settings": "catalog:",
     "@deepseek-ai/dsh-typert-protocol": "catalog:",
     "@deepseek-ai/dsh-workspace": "catalog:",
